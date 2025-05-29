@@ -21,7 +21,7 @@ class SerialInterface(Node):
 
         # SERIAL CONNECTION
         self.baud_rate = 115200
-        self.ser = serial.Serial('/dev/ttyUSB0', self.baud_rate)
+        self.ser = serial.Serial('/dev/ttyACM0', self.baud_rate)
 
     def listener_callback(self, msg):
         # This implementation sends only the angle differences
@@ -35,7 +35,7 @@ class SerialInterface(Node):
         # Send angle differences over serial
         for i in range (0, len(angle_diffs)):
             if (abs(angle_diffs[i]) > 0.001)&(abs(angle_diffs[i]) < self.safety_value):
-                message = "<MOTOR:" + str(i) + "|" + str(angle_diffs[i]) + ">"
+                message = "<MOTOR_" + str(i) + ":" + str(angle_diffs[i]) + ">\n"
                 self.ser.write(message.encode("utf-8"))
 
                 self.get_logger().info('Sent message: %s' % message)
