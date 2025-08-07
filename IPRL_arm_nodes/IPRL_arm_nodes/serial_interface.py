@@ -24,18 +24,18 @@ class SerialInterface(Node):
         self.ser = serial.Serial('/dev/ttyACM0', self.baud_rate)
 
     def listener_callback(self, msg):
-        # This implementation sends only the angle differences
+        # This implementation sends absolute angles
         angles = msg.data # Shoulder, Elbow, Wrist, Base, Roll
-        angle_diffs = [0,0,0,0,0]
+        new_angles = [0,0,0,0,0]
         if (self.prevAngles != []):
             for i in range (0, len(angles)):
-                angle_diffs[i] = angles[i] - self.prevAngles[i]
+                new_angles[i] = angles[i] - self.prevAngles[i]
         self.prevAngles = angles
 
         # Send angle differences over serial
-        for i in range (0, len(angle_diffs)):
-            if (abs(angle_diffs[i]) > 0.001)&(abs(angle_diffs[i]) < self.safety_value):
-                message = "<MOTOR_" + str(i) + ":" + str(angle_diffs[i]) + ">\n"
+        for i in range (0, len(new_angles)):
+            if (abs(new_angles[i]) > 0.001)&(abs(new_angles[i]) < self.safety_value):
+                message = "<MOTOR_" + str(i) + ":" + str(new_angles[i]) + ">\n"
                 self.ser.write(message.encode("utf-8"))
 
                 self.get_logger().info('Sent message: %s' % message)
