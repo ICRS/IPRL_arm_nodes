@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 import serial
 
-from std_msgs.msg import Float64MultiArray
+from iprl_arm_interfaces.msg import JointValue
 
 
 class SerialInterface(Node):
@@ -10,35 +10,38 @@ class SerialInterface(Node):
     def __init__(self):
         super().__init__('serial_interface')
         self.subscription = self.create_subscription(
-            Float64MultiArray,
-            'joint_angles',
+            JointValue,
+            'joint_values',
             self.listener_callback,
             10)
         self.subscription  # prevent unused variable warning
 
-        self.prevAngles = []
-        self.safety_value = 20
-
         # SERIAL CONNECTION
         self.baud_rate = 115200
-        self.ser = serial.Serial('/dev/ttyACM0', self.baud_rate)
+        self.ser = serial.Serial('/dev/ttyUSB0', self.baud_rate)
 
     def listener_callback(self, msg):
-        # This implementation sends absolute angles
-        angles = msg.data # Shoulder, Elbow, Wrist, Base, Roll
-        new_angles = [0,0,0,0,0]
-        if (self.prevAngles != []):
-            for i in range (0, len(angles)):
-                new_angles[i] = angles[i] - self.prevAngles[i]
-        self.prevAngles = angles
+        # This implementation sends one command over Serial and reads the response
+        joint_ID = msg.joint_id # Base, Shoulder, Elbow, Wrist, Roll, Grasp
+        value = msg.value
+        is_retrieval = msg.is_retrieval
 
-        # Send angle differences over serial
-        for i in range (0, len(new_angles)):
-            if (abs(new_angles[i]) > 0.001)&(abs(new_angles[i]) < self.safety_value):
-                message = "<MOTOR_" + str(i) + ":" + str(new_angles[i]) + ">\n"
-                self.ser.write(message.encode("utf-8"))
+        message_type = "DES_VAL"
+        message_data = str(joint_ID)
+        if is_retrieval: #TODO: DECIDE WHETHER THIS WOULD BE BETTER AS A SEPARATE MESSAGE TYPE
+            # Change to retrieval type code
+            message_type = "CUR_ANG"
+        else:
+            # Add desired joint value
+            message_data = message_data + "," + str(value)
 
-                self.get_logger().info('Sent message: %s' % message)
+        # Send new value over serial
+        message = "<" + message_type + ":" + message_data + ">\n"
+        self.ser.write(message.encode("utf-8"))
+
+        self.get_logger().info('Sent message: %s' % message)
+        response = self.ser.readline().decode("utf-8")
+        self.get_logger().info('Response received: %s' % response)
         
 
 def main(args=None):
