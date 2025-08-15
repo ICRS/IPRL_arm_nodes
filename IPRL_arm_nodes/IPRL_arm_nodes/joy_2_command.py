@@ -21,7 +21,7 @@ class Joy2Command(Node):
         self.ang_subscription = self.create_subscription(JointValue, "read_joint_values", self.angle_callback, 2)
 
         # values
-        self.encoder_values = [0, 0, 0, 0, 0] # base shoulder elbow wrist roll grasp
+        self.encoder_values = [0, 0, 0, 0, 0, 0] # base shoulder elbow wrist roll grasp
         self.values_to_write = []
         self.primed_array = [False,False,False] #whether shoulder elbow wrist have been read yet
         self.primed = False
@@ -46,12 +46,12 @@ class Joy2Command(Node):
                     msg.is_retrieval = False
 
                     self.publisher_.publish(msg)
-                    self.get_logger().info('Publishing: "%s"' % msg.data)
+                    self.get_logger().info('Publishing: "%s"' % str(msg))
 
             # IMPORTANT: UPDATE STATE FROM ENCODERS
             self.arm.updateCurrentAngles(current_state)
             # And reset values to write
-            self.values_to_write = [0, self.encoder_values[i]]
+            self.values_to_write = self.encoder_values
 
     def angle_callback(self, msg):
         """Constantly checks for updated encoder values and keeps array updated"""
@@ -64,6 +64,7 @@ class Joy2Command(Node):
             self.primed_array[joint_id-1] = True
             if self.primed_array==[True,True,True]:
                 self.arm.updateCurrentAngles(self.encoder_values)
+                self.values_to_write = self.encoder_values.copy()
                 self.primed = True
                 self.get_logger().info("Arm is primed, ready to move")
                 self.get_logger().info("Initial values: %s" % str(self.encoder_values))
