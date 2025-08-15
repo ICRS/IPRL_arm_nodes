@@ -1,23 +1,23 @@
 import rclpy
 from rclpy.node import Node
 import serial
-
-from iprl_arm_interfaces.msg import JointValue
+from sensor_msgs.msg import JointState
+import re
+PATTERN_ANG = re.compile(r"<CUR_ANG:([-+]?\d*\.\d+),([-+]?\d*\.\d+),([-+]?\d*\.\d+),([-+]?\d*\.\d+)>")
 
 
 class SerialInterface(Node):
 
     def __init__(self):
         super().__init__('serial_interface')
-        self.received_values_queue = []
 
-        self.publisher = self.create_publisher(JointValue, 'read_joint_values', 3)
+        self.publisher = self.create_publisher(JointState, 'read_joint_values', 3)
         pub_timer_freq = 20  # Hz
-        self.pub_timer = self.create_timer(1/pub_timer_freq, self.timer_callback)
+        self.serial_read_timer = self.create_timer(1/pub_timer_freq, self.read_loop)
 
         self.subscription = self.create_subscription(
-            JointValue,
-            'request_joint_values',
+            JointState,
+            'set_joint_values',
             self.listener_callback,
             10)
         self.subscription  # prevent unused variable warning
@@ -26,42 +26,49 @@ class SerialInterface(Node):
         self.baud_rate = 115200
         self.ser = serial.Serial('/dev/ttyUSB0', self.baud_rate) #TODO: CHANGE BACK TO ACM0
 
-    def timer_callback(self):
-        if self.received_values_queue != []:
-            value_pair = self.received_values_queue.pop(-1)
-            msg = JointValue()
-            msg.joint_id = value_pair[0]
-            msg.value = value_pair[1]
-            msg.is_retrieval = True
-            
+    def read_loop(self):
+        buffer = ""
+        while rclpy.ok():
+            if self.ser.in_waiting:
+                buffer += self.ser.read(self.ser.in_waiting).decode(errors='ignore')
+                while '\n' in buffer:
+                    line, buffer = buffer.split('\n', 1)
+                    self.parse_line(line.strip())
+        
+    def parse_line(self, line):
+        if m := PATTERN_ANG.match(line):
+
+            msg = JointState()
+            msg.name = ["base","shoulder","elbow","wrist"]
+            msg.position = [float(m.group(1)),float(m.group(2)),float(m.group(3)),float(m.group(4))]
             self.publisher.publish(msg)
 
-    def listener_callback(self, msg):
-        # This implementation sends one command over Serial and reads the response
-        joint_ID = msg.joint_id # Base, Shoulder, Elbow, Wrist, Roll, Grasp
-        value = msg.value
-        is_retrieval = msg.is_retrieval
-
-        message_type = "DES_VAL"
-        message_data = str(joint_ID)
-        if is_retrieval: #TODO: DECIDE WHETHER THIS WOULD BE BETTER AS A SEPARATE MESSAGE TYPE
-            # Change to retrieval type code
-            message_type = "CUR_ANG"
         else:
-            # Add desired joint value
-            message_data = message_data + "," + str(value)
+            self.get_logger().warn(f"Unknown line: {line}")
 
-        # Send new value over serial
-        message = "<" + message_type + ":" + message_data + ">\n"
-        self.ser.write(message.encode("utf-8"))
+    def listener_callback(self, msg:JointState):
+        # This implementation sends one command over Serial and reads the response
+        joint_names = msg.name
+        joint_values = msg.position
+        for i in range(len(joint_names)):
+            if joint_names[i] == "base":
+                joint_id = 0
+            elif joint_names[i]  == "shoulder":
+                joint_id = 1
+            elif joint_names[i]  == "elbow":
+                joint_id = 2
+            elif joint_names[i]  == "wrist":
+                joint_id = 3
+            else:
+                self.get_logger().warn(f"Unknown joint: {msg.name}")
+            value = joint_values[i]
 
-        self.get_logger().info('Sent message: %s' % message)
-        response = self.ser.readline().decode("utf-8")
-        self.get_logger().info('Response received: %s' % response)
 
-        if is_retrieval:
-            received_angle = float(response[response.find(":")+1:-1].strip(">\r"))
-            self.received_values_queue.append((joint_ID, received_angle))
+            message = f"<DES_VAL:{joint_id},{value}>\n"
+            self.ser.write(message.encode("utf-8"))
+
+            self.get_logger().info('Sent message: %s' % message)
+
         
 
 def main(args=None):

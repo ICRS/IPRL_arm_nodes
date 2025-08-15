@@ -1,9 +1,7 @@
 import rclpy
 from rclpy.node import Node
 import arm_utilities
-
-from iprl_arm_interfaces.msg import JointValue
-from sensor_msgs.msg import Joy
+from sensor_msgs.msg import Joy, JointState
 
 class Joy2Command(Node):
 
@@ -11,14 +9,15 @@ class Joy2Command(Node):
         super().__init__('joy_2_command')
 
         # publisher
-        self.publisher_ = self.create_publisher(JointValue, 'request_joint_values', 2)
+        self.joint_names = ['base','shoulder','elbow','wrist','roll','grasp']
+        self.publisher_ = self.create_publisher(JointState, 'set_joint_values', 2)
         self.timer_period = 0.1  # seconds
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
         
         #subscriber
         self.joy_subscription = self.create_subscription(Joy, "joy", self.listener_callback, 2)
         self.joy_sample_period = self.timer_period/2
-        self.ang_subscription = self.create_subscription(JointValue, "read_joint_values", self.angle_callback, 2)
+        self.ang_subscription = self.create_subscription(JointState, "read_joint_values", self.angle_callback, 2)
 
         # values
         self.encoder_values = [0, 0, 0, 0, 0, 0] # base shoulder elbow wrist roll grasp
@@ -38,36 +37,40 @@ class Joy2Command(Node):
         if self.primed:
             current_state = self.encoder_values
             new_state = self.values_to_write
-            for i in range(0, len(current_state)):
+            msg = JointState()
+            joint_names = []
+            joint_values = []
+            for i in range(len(current_state)):
+                
                 if current_state[i] != new_state[i]:
-                    msg = JointValue()
-                    msg.joint_id  = i
-                    msg.value = float(new_state[i])
-                    msg.is_retrieval = False
+                    joint_names.append(self.joint_names[i])
+                    joint_values.append(float(new_state[i]))
 
-                    self.publisher_.publish(msg)
-                    self.get_logger().info('Publishing: "%s"' % str(msg))
+            msg.name = joint_names
+            msg.position = joint_values
+            self.publisher_.publish(msg)
+            self.get_logger().info('Publishing: "%s"' % str(msg))
 
             # IMPORTANT: UPDATE STATE FROM ENCODERS
             self.arm.updateCurrentAngles(current_state)
             # And reset values to write
             self.values_to_write = self.encoder_values
 
-    def angle_callback(self, msg):
+    def angle_callback(self, msg:JointState):
         """Constantly checks for updated encoder values and keeps array updated"""
-        joint_id = msg.joint_id
-        joint_value = msg.value
-        self.encoder_values[joint_id] = joint_value
+        joint_names = msg.name
+        joint_values = msg.position
+        for joint_id in range(len(joint_values)):
+            self.encoder_values[joint_id] = joint_values[joint_id]
 
-        # Check whether initial angles have been read
-        if ((self.primed != True) and (self.primed_array[joint_id-1] == False)):
-            self.primed_array[joint_id-1] = True
-            if self.primed_array==[True,True,True]:
-                self.arm.updateCurrentAngles(self.encoder_values)
-                self.values_to_write = self.encoder_values.copy()
-                self.primed = True
-                self.get_logger().info("Arm is primed, ready to move")
-                self.get_logger().info("Initial values: %s" % str(self.encoder_values))
+            if ((self.primed != True) and (self.primed_array[joint_id-1] == False)):
+                self.primed_array[joint_id-1] = True
+                if self.primed_array==[True,True,True]:
+                    self.arm.updateCurrentAngles(self.encoder_values)
+                    self.values_to_write = self.encoder_values.copy()
+                    self.primed = True
+                    self.get_logger().info("Arm is primed, ready to move")
+                    self.get_logger().info("Initial values: %s" % str(self.encoder_values))
 
     def map_buttons(self, button_array):
         """ Maps buttons on controller to False if unpressed, True if pressed"""
