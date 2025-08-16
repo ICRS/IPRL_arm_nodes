@@ -53,6 +53,10 @@ class Arm():
 
         desiredPositionX = currentPosition[0] + dx
         desiredPositionY = currentPosition[1] + dy
+
+        # Prevent out of bounds dying
+        if math.sqrt(desiredPositionX**2 + desiredPositionY**2) > (self.upperArmLength+self.foreArmLength+self.gripperLength-15):
+            return [self.currentAngleShoulder, self.currentAngleElbow, self.currentAngleWrist]
         
         # Absolute angle of the end effector: phi
         phi = math.radians(self.currentAngleShoulder+self.currentAngleElbow+self.currentAngleWrist) + math.radians(dphi)
