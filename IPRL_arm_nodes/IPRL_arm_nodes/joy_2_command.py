@@ -22,6 +22,7 @@ class Joy2Command(Node):
         # values
         self.encoder_values = [0, 0, 0, 0, 0, 0] # base shoulder elbow wrist roll grasp
         self.values_to_write = []
+        self.end_effector_incs = [0,0,0]
         self.primed_array = [False,False,False] #whether shoulder elbow wrist have been read yet
         self.primed = False
 
@@ -35,6 +36,11 @@ class Joy2Command(Node):
 
     def timer_callback(self):
         if self.primed:
+            # Perform arm IK
+            if self.end_effector_incs != [0,0,0]:
+                self.values_to_write[1:4] = self.arm.IK2D(self.end_effector_incs[0], self.end_effector_incs[1], self.end_effector_incs[2])
+
+            # Check if state changed
             new_state = self.values_to_write.copy()
             msg = JointState()
             joint_names = []
@@ -47,16 +53,18 @@ class Joy2Command(Node):
                     joint_names.append(self.joint_names[i])
                     joint_values.append(float(new_state[i]))
                     changed = True
+            # Send updated angles
             if changed:
                 msg.name = joint_names
                 msg.position = joint_values
                 self.publisher_.publish(msg)
                 self.get_logger().info('Setting joints "%s" to "%s"' % (str(msg.name), str(msg.position)))
+
+                # IMPORTANT: UPDATE STATE FROM ENCODERS
+                # And reset values to write
                 self.values_to_write = self.encoder_values.copy()
                 self.arm.updateCurrentAngles(current_state)
-
-            # IMPORTANT: UPDATE STATE FROM ENCODERS
-            # And reset values to write
+                self.end_effector_incs = [0,0,0]
 
     def angle_callback(self, msg:JointState):
         """Constantly checks for updated encoder values and keeps array updated"""
@@ -118,8 +126,8 @@ class Joy2Command(Node):
                 # Find new IK angles; affected by Z, Y, ENDPOINT_ANGLE
                 # Value of new_state[1:2] is absolute angle to move to
                 if ((axes_dict["Z"] != 0) | (axes_dict["Y"] != 0) | (axes_dict["ENDPOINT_ANGLE"] != 0)):
-                    new_angles = self.arm.IK2D(axes_dict["Y"]*speed*self.max_velocity*self.joy_sample_period, axes_dict["Z"]*speed*self.max_velocity*self.joy_sample_period, axes_dict["ENDPOINT_ANGLE"]*speed*self.max_angular_speed*self.joy_sample_period)
-                    self.values_to_write[1:4] = new_angles
+                    new_incs = [axes_dict["Y"]*speed*self.max_velocity*self.joy_sample_period, axes_dict["Z"]*speed*self.max_velocity*self.joy_sample_period, axes_dict["ENDPOINT_ANGLE"]*speed*self.max_angular_speed*self.joy_sample_period]
+                    self.end_effector_incs = [sum(inc) for inc in zip(new_incs, self.end_effector_incs)]
             # Wrist roll; affected by ROLL
             # Value of new_state[4] is number of seconds to roll wrist, sense depending on sign
             self.values_to_write[4] = self.values_to_write[4] + self.joy_sample_period*axes_dict["ROLL"]
