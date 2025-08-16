@@ -27,34 +27,36 @@ class Joy2Command(Node):
 
         # arm variables
         self.arm = arm_utilities.Arm([0, -90, 90, 0, 0])
-        self.slow = 0.3
-        self.fast = 1
+        self.slow = 20
+        self.fast = 50
         self.max_velocity = 5 #cm/s
         self.max_angular_speed = 5 #deg/s
         self.max_opening_speed = 3 #cm/s
 
     def timer_callback(self):
         if self.primed:
-            current_state = self.encoder_values
             new_state = self.values_to_write
             msg = JointState()
             joint_names = []
             joint_values = []
-            for i in range(len(current_state)):
+            current_state = self.encoder_values
+            changed = False
+            for i in range(len(new_state)):
                 
                 if current_state[i] != new_state[i]:
                     joint_names.append(self.joint_names[i])
                     joint_values.append(float(new_state[i]))
-
-            msg.name = joint_names
-            msg.position = joint_values
-            self.publisher_.publish(msg)
-            self.get_logger().info('Publishing: "%s"' % str(msg))
+                    changed = True
+            if changed:
+                msg.name = joint_names
+                msg.position = joint_values
+                self.publisher_.publish(msg)
+                self.get_logger().info('Publishing: "%s"' % str(msg))
+                self.values_to_write = self.encoder_values.copy()
+                self.arm.updateCurrentAngles(current_state)
 
             # IMPORTANT: UPDATE STATE FROM ENCODERS
-            self.arm.updateCurrentAngles(current_state)
             # And reset values to write
-            self.values_to_write = self.encoder_values
 
     def angle_callback(self, msg:JointState):
         """Constantly checks for updated encoder values and keeps array updated"""
@@ -99,9 +101,9 @@ class Joy2Command(Node):
 
     def listener_callback(self, msg):
         if self.primed:
+            
             buttons_dict = self.map_buttons(msg.buttons)
             axes_dict = self.map_axes(msg.axes)
-            
             # dead man's switch on all but wrist roll and grasp; affected by SLOW, FAST
             speed = 0
             if buttons_dict["SLOW"] == 1:
@@ -112,7 +114,7 @@ class Joy2Command(Node):
                 # Check for base rotation; affected by BASE
                 # Value of new_state[0] is change in base angle about horizontal
                 if axes_dict["BASE"] != 0:
-                    self.values_to_write[0] = self.values_to_write[0] + axes_dict["BASE"]*speed*self.max_angular_speed
+                    self.values_to_write[0] = self.values_to_write[0] + axes_dict["BASE"]*speed * self.joy_sample_period
                 # Find new IK angles; affected by Z, Y, ENDPOINT_ANGLE
                 # Value of new_state[1:2] is absolute angle to move to
                 if ((axes_dict["Z"] != 0) | (axes_dict["Y"] != 0) | (axes_dict["ENDPOINT_ANGLE"] != 0)):

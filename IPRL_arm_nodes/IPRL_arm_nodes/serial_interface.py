@@ -64,7 +64,7 @@ class SerialInterface(Node):
             value = joint_values[i]
 
 
-            message = f"<DES_VAL:{joint_id},{value}>\n"
+            message = f"<DES_VAL:{joint_id},{round(value,1)}>\n"
             self.ser.write(message.encode("utf-8"))
 
             self.get_logger().info('Sent message: %s' % message)
