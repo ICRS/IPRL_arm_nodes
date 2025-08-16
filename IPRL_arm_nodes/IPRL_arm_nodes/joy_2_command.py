@@ -11,12 +11,12 @@ class Joy2Command(Node):
         # publisher
         self.joint_names = ['base','shoulder','elbow','wrist','roll','grasp']
         self.publisher_ = self.create_publisher(JointState, 'set_joint_values', 2)
-        self.timer_period = 0.1  # seconds
+        self.timer_period = 0.5  # seconds
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
         
         #subscriber
         self.joy_subscription = self.create_subscription(Joy, "joy", self.listener_callback, 2)
-        self.joy_sample_period = self.timer_period/2
+        self.joy_sample_period = 1/40 # Depends on controller frequency
         self.ang_subscription = self.create_subscription(JointState, "read_joint_values", self.angle_callback, 2)
 
         # values
@@ -27,15 +27,15 @@ class Joy2Command(Node):
 
         # arm variables
         self.arm = arm_utilities.Arm([0, -90, 90, 0, 0])
-        self.slow = 20
-        self.fast = 50
-        self.max_velocity = 5 #cm/s
-        self.max_angular_speed = 5 #deg/s
+        self.slow = 0.5
+        self.fast = 1
+        self.max_velocity = 50 #mm/s
+        self.max_angular_speed = 15 #deg/s
         self.max_opening_speed = 3 #cm/s
 
     def timer_callback(self):
         if self.primed:
-            new_state = self.values_to_write
+            new_state = self.values_to_write.copy()
             msg = JointState()
             joint_names = []
             joint_values = []
@@ -51,7 +51,7 @@ class Joy2Command(Node):
                 msg.name = joint_names
                 msg.position = joint_values
                 self.publisher_.publish(msg)
-                self.get_logger().info('Publishing: "%s"' % str(msg))
+                self.get_logger().info('Setting joints "%s" to "%s"' % (str(msg.name), str(msg.position)))
                 self.values_to_write = self.encoder_values.copy()
                 self.arm.updateCurrentAngles(current_state)
 
@@ -72,7 +72,7 @@ class Joy2Command(Node):
                     self.values_to_write = self.encoder_values.copy()
                     self.primed = True
                     self.get_logger().info("Arm is primed, ready to move")
-                    self.get_logger().info("Initial values: %s" % str(self.encoder_values))
+                    self.get_logger().info("Initial values: %s" % str(self.arm.getCurrentAngles()))
 
     def map_buttons(self, button_array):
         """ Maps buttons on controller to False if unpressed, True if pressed"""
@@ -114,7 +114,7 @@ class Joy2Command(Node):
                 # Check for base rotation; affected by BASE
                 # Value of new_state[0] is change in base angle about horizontal
                 if axes_dict["BASE"] != 0:
-                    self.values_to_write[0] = self.values_to_write[0] + axes_dict["BASE"]*speed * self.joy_sample_period
+                    self.values_to_write[0] = self.values_to_write[0] + axes_dict["BASE"]*speed*self.max_angular_speed*self.joy_sample_period
                 # Find new IK angles; affected by Z, Y, ENDPOINT_ANGLE
                 # Value of new_state[1:2] is absolute angle to move to
                 if ((axes_dict["Z"] != 0) | (axes_dict["Y"] != 0) | (axes_dict["ENDPOINT_ANGLE"] != 0)):
