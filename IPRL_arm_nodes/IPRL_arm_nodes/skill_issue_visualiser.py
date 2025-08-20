@@ -18,54 +18,52 @@ class ArmVisualiser(Node):
         self.subscription  # prevent unused variable warning
 
         # Arm vars
-        self.joint_names = ['base','shoulder','elbow','wrist','roll','grasp','']
-        self.joint_defaults = [45, -90, 90, 45, 0, 0]
-        self.link_lengths = [0, 0.325, 0.330, 0.195, 0, 0]
+        self.joint_names = ['base','shoulder','elbow','wrist']
+        self.joint_states = [45, -90, 90, -45] #theta_1, theta_2, theta_3, theta_4
+        self.link_lengths = [10, 32.5, 33.0, 19.5] # base-shoulder, shoulder-elbow, elbow-wrist, wrist-end (in m)
 
         # Init plot
         self.arm_sim = plt.figure()
         self.ax = self.arm_sim.add_subplot(111, projection='3d')
-
+        
         # Init to home
         init_msg = JointState()
-        init_msg.name = self.joint_names.copy()[:-1]
-        init_msg.position = self.joint_defaults.copy()
+        init_msg.name = self.joint_names
+        init_msg.position = self.joint_states
         self.listener_callback(init_msg)
 
         # Start showing plot
         plt.show()
 
-    def make_relative_point(self, transformation):
-        vector = transformation[2:5]
-        # Rotate about x
-        theta = transformation[5]
-        vector = [vector[0],
-                  vector[1]*math.cos(theta) - vector[2]*math.sin(theta),
-                  vector[1]*math.sin(theta) + vector[2]*math.cos(theta)]
-        # Rotate about y
-        phi = transformation[6]
-        vector = [vector[0]*math.cos(phi) - vector[2]*math.sin(phi),
-                  vector[1],
-                  vector[0]*math.sin(phi) + vector[2]*math.cos(phi)]
-        # Rotate about z
-        gamma = transformation[7]
-        vector = [vector[0]*math.cos(gamma) - vector[1]*math.sin(gamma),
-                  vector[0]*math.sin(gamma) + vector[1]*math.cos(gamma),
-                  vector[2]]
-        return vector
+    def update_joint_points(self):
+        theta_1, theta_2, theta_3, theta_4 = math.radians(self.joint_states[0]), math.radians(self.joint_states[1]), math.radians(self.joint_states[2]), math.radians(self.joint_states[3])
+        self.get_logger().info("Thetas: %s" % str([theta_1, theta_2, theta_3, theta_4]))
+        L1, L2, L3, L4 = self.link_lengths[0], self.link_lengths[1], self.link_lengths[2], self.link_lengths[3]
 
-    def plot_relative_points(self, point_list):
+        c1, c2 = math.cos(theta_1), math.cos(theta_2)
+        s1, s2 = math.sin(theta_1), math.sin(theta_2)
+        c23, c234 = math.cos(theta_2+theta_3), math.cos(theta_2+theta_3+theta_4)
+        s23, s234 = math.sin(theta_2+theta_3), math.sin(theta_2+theta_3+theta_4)
+
+        base_point = [0,0,0]
+        shoulder_point = [0,0,L1]
+        elbow_point = [L2*c1*c2, L2*s1*c2, L1-L2*s2]
+        wrist_point = [c1*(L2*c2+L3*c23), s1*(L2*c2+L3*c23), L1-L2*s2-L3*s23]
+        self.get_logger().info("Elbow point: %s" % str(wrist_point))
+        end_effector_point = [c1*(L2*c2+L3*c23+L4*c234), s1*(L2*c2+L3*c23+L4*c234), L1-L2*s2-L3*s23-L4*s234]
+
+        return [base_point, shoulder_point, elbow_point, wrist_point, end_effector_point]
+
+    def plot_joint_points(self, point_list):
         self.get_logger().info("Point list: %s" % str(point_list))
         plt.cla()
-        x, y, z = 0, 0, 0
-        x_e, y_e, z_e = 0, 0, 0
-        for point in point_list:
-            x_e += point[0]
-            y_e += point[1]
-            z_e += point[2]
-            self.ax.plot([x, x_e], [y, y_e], zs=[z,z_e])
-            x,y,z = x_e,y_e,z_e
+        for i in range(0, len(point_list)-1):
+            start = point_list[i]
+            end = point_list[i+1]
+            self.get_logger().info("Plotting from point %s to point %s" % (str(start), str(end)))
+            self.ax.plot([start[0], end[0]], [start[1], end[1]], zs=[start[2], end[2]])
         plt.draw()
+        plt.show()
 
     def listener_callback(self, msg):
         joints_changed = msg.name
@@ -73,35 +71,15 @@ class ArmVisualiser(Node):
 
         self.get_logger().info("Processing changed joints: %s" % str(joints_changed))
 
-        relative_points = [] 
-
-        # Convert from names and positions to transforms
+        # Update 
         for i in range (0, len(joints_changed)):
             joint = joints_changed[i]
             joint_angle = new_angles[i]
-            joint_id = self.joint_names.index(joint)
 
-            # Convert from joint angle to tf2
-            transform_list = [
-                self.joint_names[joint_id], #frame id
-                self.joint_names[joint_id+1], #child frame id
-                self.link_lengths[joint_id], #x
-                0, #y
-                0, #z
-                0, #rot about x
-                0, #rot about y
-                0 #rot about z
-            ]
-            if (1 <= joint_id <= 4): #base shoulder elbow wrist use angles
-                transform_list[7] = math.radians(joint_angle)
-                if (joint_id == 1): #base has rotation
-                    transform_list[5] = math.radians(-90)
-
-            self.get_logger().info("Converting joint %s with ID %s" % (str(joint), str(joint_id)))
-
-            relative_points.append(self.make_relative_point(transform_list))
-
-        self.plot_relative_points(relative_points)
+            if joint in self.joint_names:
+                self.joint_states[self.joint_names.index(joint)] = joint_angle
+        
+        self.plot_joint_points(self.update_joint_points())
 
 def main(args=None):
     rclpy.init(args=args)
