@@ -10,7 +10,7 @@ class Joy2Command(Node):
 
         # publisher
         self.joint_names = ['base','shoulder','elbow','wrist','roll','grasp']
-        self.publisher_ = self.create_publisher(JointState, 'set_joint_values', 2)
+        self.publisher_ = self.create_publisher(JointState, "set_joint_values", 2)
         self.timer_period = 0.5  # seconds
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
         

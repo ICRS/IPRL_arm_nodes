@@ -3,6 +3,7 @@ from rclpy.node import Node
 import serial
 from sensor_msgs.msg import JointState
 import re
+import threading 
 PATTERN_ANG = re.compile(r"<CUR_ANG:([-+]?\d*\.\d+),([-+]?\d*\.\d+),([-+]?\d*\.\d+),([-+]?\d*\.\d+)>")
 
 
@@ -11,13 +12,11 @@ class SerialInterface(Node):
     def __init__(self):
         super().__init__('serial_interface')
 
-        self.publisher = self.create_publisher(JointState, 'read_joint_values', 3)
-        pub_timer_freq = 20  # Hz
-        self.serial_read_timer = self.create_timer(1/pub_timer_freq, self.read_loop)
-
+        self.publisher = self.create_publisher(JointState, 'read_joint_values', 2)
+        
         self.subscription = self.create_subscription(
             JointState,
-            'set_joint_values',
+            "set_joint_values",
             self.listener_callback,
             10)
         self.subscription  # prevent unused variable warning
@@ -25,6 +24,10 @@ class SerialInterface(Node):
         # SERIAL CONNECTION
         self.baud_rate = 115200
         self.ser = serial.Serial('/dev/ttyUSB0', self.baud_rate) #TODO: CHANGE BACK TO ACM0
+        self.read_thread = threading.Thread(target=self.read_loop, daemon=True)
+        self.read_thread.start()
+
+        self.get_logger().info("Started reading thread")
 
     def read_loop(self):
         buffer = ""
