@@ -26,9 +26,6 @@ class SerialInterface(Node):
             10)
         self.subscription  # prevent unused variable warning
 
-        self.prevAngles = []
-        self.safety_value = 20
-
         # Setup serial
         ports = sorted(glob.glob('/dev/ttyUSB*'))
         if not ports:
@@ -137,26 +134,9 @@ class SerialInterface(Node):
 
         else:
             self.get_logger().warn(f"Unknown line: {line}")
-
-    def listener_callback(self, msg):
-        # This implementation sends only the angle differences
-        angles = msg.data # Shoulder, Elbow, Wrist, Base, Roll
-        angle_diffs = [0,0,0,0,0]
-        if (self.prevAngles != []):
-            for i in range (0, len(angles)):
-                angle_diffs[i] = angles[i] - self.prevAngles[i]
-        self.prevAngles = angles
-
-        # Send angle differences over serial
-        for i in range (0, len(angle_diffs)):
-            if (abs(angle_diffs[i]) > 0.001)&(abs(angle_diffs[i]) < self.safety_value):
-                message = "<MOTOR_" + str(i) + ":" + str(angle_diffs[i]) + ">\n"
-                self.ser.write(message.encode("utf-8"))
-
-                self.get_logger().info('Sent message: %s' % message)
         
     def listener_callback(self, msg:JointState):
-        # This implementation sends one command over Serial and reads the response
+        # This implementation sends one command over Serial
         joint_names = msg.name
         joint_values = msg.position
         for i in range(len(joint_names)):
