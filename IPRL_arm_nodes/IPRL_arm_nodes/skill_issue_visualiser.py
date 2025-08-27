@@ -3,6 +3,7 @@ from rclpy.node import Node
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 from sensor_msgs.msg import JointState
 
@@ -23,8 +24,9 @@ class ArmVisualiser(Node):
         self.link_lengths = [10, 32.5, 33.0, 19.5] # base-shoulder, shoulder-elbow, elbow-wrist, wrist-end (in m)
 
         # Init plot
-        self.arm_sim = plt.figure()
-        self.ax = self.arm_sim.add_subplot(111, projection='3d')
+        plt.ion()
+        self.arm_sim_fig = plt.figure()
+        self.ax = self.arm_sim_fig.add_subplot(111, projection='3d')
         
         # Init to home
         init_msg = JointState()
@@ -33,7 +35,7 @@ class ArmVisualiser(Node):
         self.listener_callback(init_msg)
 
         # Start showing plot
-        plt.show()
+        plt.show(block=True)
 
     def update_joint_points(self):
         theta_1, theta_2, theta_3, theta_4 = math.radians(self.joint_states[0]), math.radians(self.joint_states[1]), math.radians(self.joint_states[2]), math.radians(self.joint_states[3])
@@ -56,14 +58,12 @@ class ArmVisualiser(Node):
 
     def plot_joint_points(self, point_list):
         self.get_logger().info("Point list: %s" % str(point_list))
-        plt.cla()
         for i in range(0, len(point_list)-1):
             start = point_list[i]
             end = point_list[i+1]
             self.get_logger().info("Plotting from point %s to point %s" % (str(start), str(end)))
             self.ax.plot([start[0], end[0]], [start[1], end[1]], zs=[start[2], end[2]])
-        plt.draw()
-        plt.show()
+        self.arm_sim_fig.canvas.draw()
 
     def listener_callback(self, msg):
         joints_changed = msg.name
