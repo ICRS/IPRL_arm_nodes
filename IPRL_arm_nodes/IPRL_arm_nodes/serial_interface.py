@@ -17,7 +17,7 @@ class SerialInterface(Node):
     def __init__(self):
         super().__init__('serial_interface')
 
-        self.publisher = self.create_publisher(JointState, 'read_joint_values', 2)
+        self.publisher = self.create_publisher(JointState, "read_joint_values", 2)
         
         self.subscription = self.create_subscription(
             JointState,
