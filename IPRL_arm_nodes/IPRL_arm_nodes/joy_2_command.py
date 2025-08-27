@@ -70,10 +70,13 @@ class Joy2Command(Node):
         """Constantly checks for updated encoder values and keeps array updated"""
         joint_names = msg.name
         joint_values = msg.position
-        for joint_id in range(len(joint_values)):
-            self.encoder_values[joint_id] = joint_values[joint_id]
 
-            if ((self.primed != True) and (self.primed_array[joint_id-1] == False)):
+        self.get_logger().info("Received message: %s" % str(msg))
+        for joint_name in joint_names:
+            joint_id = self.joint_names.index(joint_name)
+            self.encoder_values[joint_id] = joint_values[joint_names.index(joint_name)]
+
+            if ((joint_name != "base") and (self.primed != True) and (self.primed_array[joint_id-1] == False)):
                 self.primed_array[joint_id-1] = True
                 if self.primed_array==[True,True,True]:
                     self.arm.updateCurrentAngles(self.encoder_values)

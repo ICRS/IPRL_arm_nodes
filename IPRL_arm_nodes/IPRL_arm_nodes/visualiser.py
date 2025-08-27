@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 import math
 import numpy as np
-import matplotlib.pyplot as plt
+from tf2_ros import Buffer, TransformListener, TransformBroadcaster
 
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import TransformStamped, Transform
@@ -34,33 +34,31 @@ def quaternion_from_euler(ai, aj, ak):
 class ArmVisualiser(Node):
     def __init__(self):
         super().__init__('arm_visualiser')
-        self.publisher_ = self.create_publisher(TFMessage, 'tf', 2)
-        self.timer_period = 0.2  # seconds
-        self.timer = self.create_timer(self.timer_period, self.timer_callback)
+
+        # Init tf publisher
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.tf_publisher = TransformBroadcaster(self)
+        self.timer_frequency = 15  # Hz
+        self.timer = self.create_timer(1/self.timer_frequency, self.timer_callback)
+
+        # Debugging publishers
+        self.debug_mode = False
+        if self.debug_mode:
+            self.debug_publisher = self.create_publisher(JointState, 'read_joint_values', 2)
         
+        # Init jointstate subscriber
         self.subscription = self.create_subscription(
             JointState,
-            'set_joint_values', #or read joint values
+            "set_joint_values", #or read joint values
             self.listener_callback,
             2)
         self.subscription  # prevent unused variable warning
 
         # Arm vars
-        self.joint_names = ['map','base','shoulder','elbow','wrist','roll','grasp','']
-        self.joint_defaults = [0, 0, -90, 90, 0, 0, 0]
-        self.link_lengths = [0, 0, 0.325, 0.330, 0.195, 0, 0]
-        # Holds current state to publish
-        self.current_arm_state = TFMessage()
-
-        # # Init map
-        map = TFMessage()
-        map.transforms = [self.make_transforms(['map','base',0,0,0,0,0,0])]
-        self.publisher_.publish(map)
-        # Init to home
-        init_msg = JointState()
-        init_msg.name = self.joint_names.copy()[:-1]
-        init_msg.position = self.joint_defaults.copy()
-        self.listener_callback(init_msg)
+        self.joint_names = ["map","base","shoulder","elbow","wrist","roll","grasp"]
+        self.joint_states = [0, -90, 90, 0, 0, 0] # theta1, theta2, theta3, theta4, theta5
+        self.link_lengths = [0, 0.1, 0.325, 0.33, 0.195, 0, 0] # in m
 
     def make_transforms(self, transformation):
         t = TransformStamped()
@@ -79,24 +77,21 @@ class ArmVisualiser(Node):
         t.transform.rotation.z = quat[2]
         t.transform.rotation.w = quat[3]
 
-        self.get_logger().info("Successfully made transform for %s" % str(transformation[0]))
-        self.get_logger().info("")
-
         return t
 
     def listener_callback(self, msg):
         joints_changed = msg.name
         new_angles = msg.position
 
-        self.get_logger().info("Processing changed joints: %s" % str(joints_changed))
+        # Update joint states
+        for i in range(0, len(joints_changed)):
+            self.joint_states[self.joint_names.index(joints_changed[i])-1] = new_angles[i]
 
-        transform_msgs = [] 
+    def timer_callback(self):
+        msg_list = []
 
-        # Convert from names and positions to transforms
-        for i in range (0, len(joints_changed)):
-            joint = joints_changed[i]
-            joint_angle = new_angles[i]
-            joint_id = self.joint_names.index(joint)
+        # Convert from names and positions to transforms for current state
+        for joint_id in range (0, len(self.joint_names)-1):
 
             # Convert from joint angle to tf2
             transform_list = [
@@ -109,20 +104,24 @@ class ArmVisualiser(Node):
                 0, #rot about y
                 0 #rot about z
             ]
-            if (1 <= joint_id <= 4): #base shoulder elbow wrist use angles
-                transform_list[7] = math.radians(joint_angle)
-                if (joint_id == 1): #base has rotation
-                    transform_list[5] = math.radians(90)
+            if (joint_id == 1): #shoulder has rotation and height offset
+                transform_list[2] = 0
+                transform_list[4] = self.link_lengths[joint_id]
+                transform_list[5] = math.radians(-90)
+                transform_list[6] = math.radians(self.joint_states[joint_id])
+            elif (0 <= joint_id <= 4): #theta1-5 use angles
+                transform_list[7] = math.radians(self.joint_states[joint_id])
 
-            self.get_logger().info("Converting joint %s with ID %s" % (str(joint), str(joint_id)))
-            self.get_logger().info("Transform_list: %s" % str(transform_list))
+            msg_list.append(self.make_transforms(transform_list))
 
-            transform_msgs.append(self.make_transforms(transform_list))
+        self.tf_publisher.sendTransform(msg_list)
 
-        self.current_arm_state.transforms = transform_msgs
-    
-    def timer_callback(self):
-        self.publisher_.publish(self.current_arm_state)
+        # Pretend to be encoder messages for debugging
+        if self.debug_mode:
+            msg = JointState()
+            msg.name = ["base","shoulder","elbow","wrist"]
+            msg.position = self.joint_states[0:4]
+            self.debug_publisher.publish(msg)
 
 
 def main(args=None):
