@@ -63,7 +63,10 @@ class ArmVisualiser(Node):
         self.joint_states = [0, -90, 90, 0, 0, 0] # theta1, theta2, theta3, theta4, theta5
         self.link_lengths = [0, 0.1, 0.325, 0.33, 0.195, 0, 0] # in m
 
-        self.get_logger().info("Started visualiser")
+        mode = "normal"
+        if self.debug_mode:
+            mode = "debug"
+        self.get_logger().info("Started visualiser in %s mode" % mode)
 
     def make_transforms(self, transformation):
         t = TransformStamped()
@@ -126,6 +129,7 @@ class ArmVisualiser(Node):
             msg = JointState()
             msg.name = ["base","shoulder","elbow","wrist"]
             msg.position = self.joint_states[0:4]
+            msg.header.stamp = self.get_clock().now().to_msg()
             self.debug_publisher.publish(msg)
 
 
