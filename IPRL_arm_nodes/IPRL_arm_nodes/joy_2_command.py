@@ -9,14 +9,14 @@ class Joy2Command(Node):
         super().__init__('joy_2_command')
 
         # publisher
-        self.joint_names = ['base','shoulder','elbow','wrist','roll','grasp']
+        self.joint_names = ["base","shoulder","elbow","wrist","roll","grasp"]
         self.publisher_ = self.create_publisher(JointState, "set_joint_values", 2)
         self.timer_period = 0.5  # seconds
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
         
         #subscriber
-        self.joy_subscription = self.create_subscription(Joy, "joy", self.listener_callback, 2)
-        self.joy_sample_period = 1/40 # Depends on controller frequency
+        self.joy_subscription = self.create_subscription(Joy, "/arm/joy", self.listener_callback, 2)
+        self.joy_sample_period = 1/15 # Depends on controller frequency
         self.ang_subscription = self.create_subscription(JointState, "read_joint_values", self.angle_callback, 2)
 
         # values
@@ -30,8 +30,8 @@ class Joy2Command(Node):
         self.arm = arm_utilities.Arm([0, -90, 90, 0, 0])
         self.slow = 0.5
         self.fast = 1
-        self.max_velocity = 50 #mm/s
-        self.max_angular_speed = 15 #deg/s
+        self.max_velocity = 30 #mm/s
+        self.max_angular_speed = 10 #deg/s
         self.max_opening_speed = 3 #cm/s
 
     def timer_callback(self):
