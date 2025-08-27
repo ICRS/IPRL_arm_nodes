@@ -11,7 +11,7 @@ class Joy2Command(Node):
         # publisher
         self.joint_names = ["base","shoulder","elbow","wrist","roll","grasp"]
         self.publisher_ = self.create_publisher(JointState, "set_joint_values", 2)
-        self.timer_period = 0.5  # seconds
+        self.timer_period = 0.75  # seconds
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
         
         #subscriber
@@ -30,9 +30,10 @@ class Joy2Command(Node):
         self.arm = arm_utilities.Arm([0, -90, 90, 0, 0])
         self.slow = 0.5
         self.fast = 1
-        self.max_velocity = 30 #mm/s
-        self.max_angular_speed = 10 #deg/s
+        self.max_velocity = 50 #mm/s
+        self.max_angular_speed = 15 #deg/s
         self.max_opening_speed = 3 #cm/s
+        self.movement_threshold = 4.5 #deg per call
 
     def timer_callback(self):
         if self.primed:
@@ -49,7 +50,7 @@ class Joy2Command(Node):
             changed = False
             for i in range(len(new_state)):
                 
-                if current_state[i] != new_state[i]:
+                if (abs(current_state[i] - new_state[i]) > self.movement_threshold):
                     joint_names.append(self.joint_names[i])
                     joint_values.append(float(new_state[i]))
                     changed = True
@@ -60,18 +61,18 @@ class Joy2Command(Node):
                 self.publisher_.publish(msg)
                 self.get_logger().info('Setting joints "%s" to "%s"' % (str(msg.name), str(msg.position)))
 
-                # IMPORTANT: UPDATE STATE FROM ENCODERS
-                # And reset values to write
-                self.values_to_write = self.encoder_values.copy()
-                self.arm.updateCurrentAngles(current_state)
-                self.end_effector_incs = [0,0,0]
+            # IMPORTANT: UPDATE STATE FROM ENCODERS
+            # And reset values to write
+            self.values_to_write = self.encoder_values.copy()
+            self.arm.updateCurrentAngles(current_state)
+            self.end_effector_incs = [0,0,0]
 
     def angle_callback(self, msg:JointState):
         """Constantly checks for updated encoder values and keeps array updated"""
         joint_names = msg.name
         joint_values = msg.position
 
-        self.get_logger().info("Received message: %s" % str(msg))
+        #self.get_logger().info("Received message: %s" % str(msg))
         for joint_name in joint_names:
             joint_id = self.joint_names.index(joint_name)
             self.encoder_values[joint_id] = joint_values[joint_names.index(joint_name)]
