@@ -21,10 +21,10 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-                'arm_IK = IPRL_arm_nodes.arm_IK:main',
                 'joy_2_command = IPRL_arm_nodes.joy_2_command:main',
-                'keyboard_logger = IPRL_arm_nodes.keyboard_logger:main',
                 'serial_interface = IPRL_arm_nodes.serial_interface:main',
+                'visualiser = IPRL_arm_nodes.visualiser:main',
+                'py_visualiser = IPRL_arm_nodes.skill_issue_visualiser:main',
         ],
     },
 )
