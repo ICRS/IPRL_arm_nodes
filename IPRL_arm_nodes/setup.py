@@ -24,7 +24,6 @@ setup(
                 'joy_2_command = IPRL_arm_nodes.joy_2_command:main',
                 'serial_interface = IPRL_arm_nodes.serial_interface:main',
                 'visualiser = IPRL_arm_nodes.visualiser:main',
-                'py_visualiser = IPRL_arm_nodes.skill_issue_visualiser:main',
         ],
     },
 )
