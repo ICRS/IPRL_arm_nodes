@@ -48,9 +48,12 @@ class ArmVisualiser(Node):
             self.debug_publisher = self.create_publisher(JointState, 'read_joint_values', 2)
         
         # Init jointstate subscriber
+        receive_topic = "read_joint_values"
+        if self.debug_mode: # if debugging, visual pretends to be arm; otherwise, show state
+            receive_topic = "set_joint_values"
         self.subscription = self.create_subscription(
             JointState,
-            "set_joint_values", #or read joint values
+            receive_topic,
             self.listener_callback,
             2)
         self.subscription  # prevent unused variable warning
