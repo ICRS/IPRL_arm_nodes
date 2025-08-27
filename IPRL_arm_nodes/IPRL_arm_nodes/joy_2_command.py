@@ -11,10 +11,10 @@ class Joy2Command(Node):
         # publisher
         self.joint_names = ["base","shoulder","elbow","wrist","roll","grasp"]
         self.publisher_ = self.create_publisher(JointState, "set_joint_values", 2)
-        self.timer_period = 0.75  # seconds
+        self.timer_period = 0.2  # seconds
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
         
-        #subscriber
+        # subscriber
         self.joy_subscription = self.create_subscription(Joy, "/arm/joy", self.listener_callback, 2)
         self.joy_sample_period = 1/15 # Depends on controller frequency
         self.ang_subscription = self.create_subscription(JointState, "read_joint_values", self.angle_callback, 2)
@@ -120,23 +120,28 @@ class Joy2Command(Node):
             axes_dict = self.map_axes(msg.axes)
             # dead man's switch on all but wrist roll and grasp; affected by SLOW, FAST
             speed = 0
-            if buttons_dict["SLOW"] == 1:
+            if buttons_dict["SLOW"]:
                 speed = self.slow
-            elif buttons_dict["FAST"] == 1:
+            elif buttons_dict["FAST"]:
                 speed = self.fast
-            if speed != 0:
+            if speed:
                 # Check for base rotation; affected by BASE
                 # Value of new_state[0] is change in base angle about horizontal
                 if axes_dict["BASE"] != 0:
-                    self.values_to_write[0] = self.values_to_write[0] + axes_dict["BASE"]*speed*self.max_angular_speed*self.joy_sample_period
+                    self.values_to_write[0] = axes_dict["BASE"]*speed*self.max_angular_speed
+                
                 # Find new IK angles; affected by Z, Y, ENDPOINT_ANGLE
                 # Value of new_state[1:2] is absolute angle to move to
                 if ((axes_dict["Z"] != 0) | (axes_dict["Y"] != 0) | (axes_dict["ENDPOINT_ANGLE"] != 0)):
-                    new_incs = [axes_dict["Y"]*speed*self.max_velocity*self.joy_sample_period, axes_dict["Z"]*speed*self.max_velocity*self.joy_sample_period, axes_dict["ENDPOINT_ANGLE"]*speed*self.max_angular_speed*self.joy_sample_period]
-                    self.end_effector_incs = [sum(inc) for inc in zip(new_incs, self.end_effector_incs)]
-            # Wrist roll; affected by ROLL
-            # Value of new_state[4] is number of seconds to roll wrist, sense depending on sign
-            self.values_to_write[4] = self.values_to_write[4] + self.joy_sample_period*axes_dict["ROLL"]
+                    self.end_effector_incs = [axes_dict["Y"]*speed*self.max_velocity, axes_dict["Z"]*speed*self.max_velocity, axes_dict["ENDPOINT_ANGLE"]*speed*self.max_angular_speed]
+
+                # Wrist roll; affected by ROLL
+                # Value of new_state[4] is number of seconds to roll wrist, sense depending on sign
+                self.values_to_write[4] = self.joy_sample_period*axes_dict["ROLL"]
+
+            # Base should be reset to 0 if no movement on the joystick regardless of speed
+            if (axes_dict["BASE"] == 0):
+                self.values_to_write[0] = 0
 
             # Grasp; affected by OPEN, CLOSE
             # Value of new_state[5] is speed gripper should open/close
