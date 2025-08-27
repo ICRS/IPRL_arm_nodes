@@ -35,6 +35,8 @@ class Joy2Command(Node):
         self.max_opening_speed = 3 #cm/s
         self.movement_threshold = 4.5 #deg per call
 
+        self.get_logger().info("Started joy_2_command node, waiting to read initial arm position")
+
     def timer_callback(self):
         if self.primed:
             # Perform arm IK
