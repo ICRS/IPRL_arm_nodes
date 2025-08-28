@@ -24,6 +24,7 @@ class Joy2Command(Node):
         self.value_delta = {}
         self.prev_value_delta = {}
         self.end_effector_incs = [0,0,0]
+        self.get_ph = False
         self.primed_array = [False,False,False] #whether shoulder elbow wrist have been read yet
         self.primed = False
 
@@ -75,6 +76,15 @@ class Joy2Command(Node):
                 self.publisher_.publish(msg)
                 self.get_logger().info('Setting joints "%s" to "%s"' % (str(msg.name), str(msg.position)))
 
+            # Special case: pH reading
+            if self.get_ph:
+                # Separate message. TODO: Make new topic
+                ph_msg = JointState()
+                ph_msg.name = ["ph_probe"]
+                self.publisher_.publish(ph_msg)
+                self.get_logger().info('Requested pH value')
+                self.get_ph = False
+
             # IMPORTANT: Reset value changes and end effector increments
             self.prev_value_delta = self.value_delta.copy()
             self.value_delta = {}
@@ -104,6 +114,8 @@ class Joy2Command(Node):
 
         button_dict["SLOW"] = bool(button_array[4])
         button_dict["FAST"] = bool(button_array[5])
+
+        button_dict["PH"] = bool(button_array[2])
 
         return button_dict
 
@@ -162,6 +174,10 @@ class Joy2Command(Node):
                 if axes_dict["OPEN"]:
                     # If both triggers pulled, stop moving
                     self.value_delta["grasp"] = 0
+            
+            # pH Probe
+            if buttons_dict["PH"]:
+                self.get_ph = True
 
 
 def main(args=None):

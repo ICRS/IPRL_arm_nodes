@@ -9,6 +9,7 @@ from sensor_msgs.msg import Joy, JointState
 
 import threading 
 PATTERN_ANG = re.compile(r"<CUR_ANG:([-+]?\d*\.\d+),([-+]?\d*\.\d+),([-+]?\d*\.\d+),([-+]?\d*\.\d+)>")
+PATTERN_PH = re.compile(r"<PH_PROBE:([-+]?\d*\.\d+)>")
 
 class SerialInterface(Node):
 
@@ -132,6 +133,9 @@ class SerialInterface(Node):
             msg.position = [float(m.group(1)),float(m.group(2)),float(m.group(3)),float(m.group(4))]
             self.publisher.publish(msg)
 
+        elif m := PATTERN_PH.match(line):
+            self.get_logger().info("pH value: %s" % str(float(m.group(1))))
+
         else:
             self.get_logger().warn(f"Unknown line: {line}")
         
@@ -139,24 +143,33 @@ class SerialInterface(Node):
         # This implementation sends one command over Serial
         joint_names = msg.name
         joint_values = msg.position
-        for i in range(len(joint_names)):
-            if joint_names[i] == "base":
-                joint_id = 0
-            elif joint_names[i]  == "shoulder":
-                joint_id = 1
-            elif joint_names[i]  == "elbow":
-                joint_id = 2
-            elif joint_names[i]  == "wrist":
-                joint_id = 3
-            else:
-                self.get_logger().warn(f"Unknown joint: {msg.name}")
-            value = joint_values[i]
 
-
-            message = f"<DES_VAL:{joint_id},{round(value,1)}>\n"
+        # Send ph probe request
+        if ("ph_probe") in joint_names:
+            message = f"<PH_REQUEST:>\n"
             self.ser.write(message.encode("utf-8"))
 
             self.get_logger().info('Sent message: %s' % message)
+        else:
+            # Send joint value changes
+            for i in range(len(joint_names)):
+                if joint_names[i] == "base":
+                    joint_id = 0
+                elif joint_names[i]  == "shoulder":
+                    joint_id = 1
+                elif joint_names[i]  == "elbow":
+                    joint_id = 2
+                elif joint_names[i]  == "wrist":
+                    joint_id = 3
+                else:
+                    self.get_logger().warn(f"Unknown joint: {msg.name}")
+                value = joint_values[i]
+
+
+                message = f"<DES_VAL:{joint_id},{round(value,1)}>\n"
+                self.ser.write(message.encode("utf-8"))
+
+                self.get_logger().info('Sent message: %s' % message)
 
 def main(args=None):
     rclpy.init(args=args)

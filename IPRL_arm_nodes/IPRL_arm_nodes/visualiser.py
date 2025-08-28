@@ -93,7 +93,9 @@ class ArmVisualiser(Node):
 
         # Update joint states
         for i in range(0, len(joints_changed)):
-            self.joint_states[self.joint_names.index(joints_changed[i])-1] = new_angles[i]
+            # Remove non-joint calls from joint_states
+            if (joints_changed[i] != "ph_probe"):
+                self.joint_states[self.joint_names.index(joints_changed[i])-1] = new_angles[i]
 
     def timer_callback(self):
         msg_list = []
