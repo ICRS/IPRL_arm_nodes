@@ -14,12 +14,12 @@ PATTERN_PH = re.compile(r"<PH_PROBE:(\d+)>")
 PATTERN_PONG = re.compile(r"<PONG:(\d+)>")
 
 
-def adc_to_ph(adc_reading: int){
+def adc_to_ph(adc_reading: int):
     """This function maps the 16-bit unsigned pH sensor ADC reading to an actual pH between 1 and 14"""
     MAX_PH = 14.0
     MIN_PH = 1.0
     return float(adc_reading) * ((MAX_PH - MIN_PH) / (2**16-1)) + MIN_PH
-}
+
 
 
 class SerialInterface(Node):
