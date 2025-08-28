@@ -152,7 +152,7 @@ class Joy2Command(Node):
 
             # Grasp; affected by OPEN, CLOSE
             # Value of new_state[5] is speed gripper should open/close
-            if ("grasp" in self.prev_value_delta):
+            if (("grasp" in self.prev_value_delta) and (self.prev_value_delta["grasp"] != 0)):
                 # Defaults to 0
                 self.value_delta["grasp"] = 0
             if axes_dict["OPEN"]:
