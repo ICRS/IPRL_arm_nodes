@@ -148,7 +148,7 @@ class Joy2Command(Node):
                 # Wrist roll; affected by ROLL
                 # Value of new_state[4] is number of seconds to roll wrist, sense depending on sign
                 if (axes_dict["ROLL"]): 
-                    self.value_delta["roll"] = self.joy_sample_period*axes_dict["ROLL"]
+                    self.value_delta["roll"] = axes_dict["ROLL"]*self.timer_period*speed
 
             # Grasp; affected by OPEN, CLOSE
             # Value of new_state[5] is speed gripper should open/close
