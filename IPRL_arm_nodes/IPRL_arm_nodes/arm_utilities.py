@@ -14,7 +14,7 @@ class Arm():
         # Physical parameters of arm.
         self.upperArmLength = 325
         self.foreArmLength = 330
-        self.gripperLength = 195
+        self.gripperLength = 265
 
         # Current angles (update via encoders)
         self.currentAngleBase = initialJointAngles[0]
@@ -79,15 +79,13 @@ class Arm():
         return out_angles
 
 if __name__ == '__main__':
-    testArm = Arm([0, -90, 90, 0, 0])
+    testArm = Arm([0, -80, 128, 44, 0])
     print("Arm created")
 
     print(testArm.FK2D())
+    print(testArm.IK2D(0,0,0))
 
-    print(testArm.IK2D(-2,-32,10))
-    testArm.updateCurrentAngles([0, -90, 90, 10, 0])
-    print(testArm.FK2D())
+    new_angles = testArm.IK2D(-50,0,0)
+    print(new_angles)
 
-    print(testArm.IK2D(-2,-32,10))
-    testArm.updateCurrentAngles([0, -88.8, 88.6, 20, 0])
-    print(testArm.FK2D())
+    
