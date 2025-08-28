@@ -12,16 +12,17 @@ class Joy2Command(Node):
         self.joint_names = ["base","shoulder","elbow","wrist","roll","grasp"]
         self.publisher_ = self.create_publisher(JointState, "set_joint_values", 2)
         self.timer_period = 0.2  # seconds
-        self.timer = self.create_timer(self.timer_period, self.timer_callback)
+        self.timer = self.create_timer(self.timer_period, self.publisher_callback)
         
         # subscriber
-        self.joy_subscription = self.create_subscription(Joy, "/arm/joy", self.listener_callback, 2)
+        self.joy_subscription = self.create_subscription(Joy, "/arm/joy", self.controller_callback, 2)
         self.joy_sample_period = 1/15 # Depends on controller frequency
         self.ang_subscription = self.create_subscription(JointState, "read_joint_values", self.angle_callback, 2)
 
         # values
         self.encoder_values = [0, 0, 0, 0, 0, 0] # base shoulder elbow wrist roll grasp
-        self.values_to_write = []
+        self.value_delta = {}
+        self.prev_value_delta = {}
         self.end_effector_incs = [0,0,0]
         self.primed_array = [False,False,False] #whether shoulder elbow wrist have been read yet
         self.primed = False
@@ -37,36 +38,46 @@ class Joy2Command(Node):
 
         self.get_logger().info("Started joy_2_command node, waiting to read initial arm position")
 
-    def timer_callback(self):
+    def publisher_callback(self):
         if self.primed:
+            # Update arm state
+            current_state = self.encoder_values
+            self.arm.updateCurrentAngles(current_state)
+
             # Perform arm IK
             if self.end_effector_incs != [0,0,0]:
-                self.values_to_write[1:4] = self.arm.IK2D(self.end_effector_incs[0], self.end_effector_incs[1], self.end_effector_incs[2])
+                # Find new shoulder elbow wrist angles
+                new_SEW = self.arm.IK2D(self.end_effector_incs[0], self.end_effector_incs[1], self.end_effector_incs[2])
+                for i in range (0,len(new_SEW)):
+                    name = self.joint_names[i+1]
+                    self.value_delta[name] = new_SEW[i]-current_state[i+1]
 
-            # Check if state changed
-            new_state = self.values_to_write.copy()
+            # Init joint message
             msg = JointState()
             joint_names = []
             joint_values = []
-            current_state = self.encoder_values
-            changed = False
-            for i in range(len(new_state)):
-                
-                if (abs(current_state[i] - new_state[i]) > self.movement_threshold):
-                    joint_names.append(self.joint_names[i])
-                    joint_values.append(float(new_state[i]))
-                    changed = True
-            # Send updated angles
-            if changed:
+
+            # Construct message using value changes above threshold
+            for changed_joint in self.value_delta:
+                delta = self.value_delta[changed_joint]
+                joint_id = self.joint_names.index(changed_joint)
+                if ((changed_joint=="base") or (changed_joint=="grasp")): #base and grasp are special cases, already differential
+                    joint_names.append(changed_joint)
+                    joint_values.append(delta)
+                elif (((abs(delta) < self.movement_threshold) and (joint_id<4)) or (changed_joint=="roll" and delta==0)):
+                    pass # angle movement under threshold or no rotation time
+                else: #differential
+                    joint_names.append(changed_joint)
+                    joint_values.append(current_state[joint_id] + delta)
+            if joint_names:
                 msg.name = joint_names
                 msg.position = joint_values
                 self.publisher_.publish(msg)
                 self.get_logger().info('Setting joints "%s" to "%s"' % (str(msg.name), str(msg.position)))
 
-            # IMPORTANT: UPDATE STATE FROM ENCODERS
-            # And reset values to write
-            self.values_to_write = self.encoder_values.copy()
-            self.arm.updateCurrentAngles(current_state)
+            # IMPORTANT: Reset value changes and end effector increments
+            self.prev_value_delta = self.value_delta.copy()
+            self.value_delta = {}
             self.end_effector_incs = [0,0,0]
 
     def angle_callback(self, msg:JointState):
@@ -83,7 +94,6 @@ class Joy2Command(Node):
                 self.primed_array[joint_id-1] = True
                 if self.primed_array==[True,True,True]:
                     self.arm.updateCurrentAngles(self.encoder_values)
-                    self.values_to_write = self.encoder_values.copy()
                     self.primed = True
                     self.get_logger().info("Arm is primed, ready to move")
                     self.get_logger().info("Initial values: %s" % str(self.arm.getCurrentAngles()))
@@ -113,7 +123,7 @@ class Joy2Command(Node):
 
         return axes_dict
 
-    def listener_callback(self, msg):
+    def controller_callback(self, msg):
         if self.primed:
             
             buttons_dict = self.map_buttons(msg.buttons)
@@ -128,7 +138,7 @@ class Joy2Command(Node):
                 # Check for base rotation; affected by BASE
                 # Value of new_state[0] is change in base angle about horizontal
                 if axes_dict["BASE"] != 0:
-                    self.values_to_write[0] = axes_dict["BASE"]*speed*self.max_angular_speed
+                    self.value_delta["base"] = axes_dict["BASE"]*speed*self.max_angular_speed
                 
                 # Find new IK angles; affected by Z, Y, ENDPOINT_ANGLE
                 # Value of new_state[1:2] is absolute angle to move to
@@ -137,22 +147,21 @@ class Joy2Command(Node):
 
                 # Wrist roll; affected by ROLL
                 # Value of new_state[4] is number of seconds to roll wrist, sense depending on sign
-                self.values_to_write[4] = self.joy_sample_period*axes_dict["ROLL"]
-
-            # Base should be reset to 0 if no movement on the joystick regardless of speed
-            if (axes_dict["BASE"] == 0):
-                self.values_to_write[0] = 0
+                if (axes_dict["ROLL"]): 
+                    self.value_delta["roll"] = self.joy_sample_period*axes_dict["ROLL"]
 
             # Grasp; affected by OPEN, CLOSE
             # Value of new_state[5] is speed gripper should open/close
-            self.values_to_write[5] = 0
+            if ("grasp" in self.prev_value_delta):
+                # Defaults to 0
+                self.value_delta["grasp"] = 0
             if axes_dict["OPEN"]:
-                self.values_to_write[5] = self.max_opening_speed
+                self.value_delta["grasp"] = self.max_opening_speed
             if axes_dict["CLOSE"]:
-                self.values_to_write[5] = -1*self.max_opening_speed
+                self.value_delta["grasp"] = -1*self.max_opening_speed
                 if axes_dict["OPEN"]:
                     # If both triggers pulled, stop moving
-                    self.values_to_write[5] = 0
+                    self.value_delta["grasp"] = 0
 
 
 def main(args=None):
