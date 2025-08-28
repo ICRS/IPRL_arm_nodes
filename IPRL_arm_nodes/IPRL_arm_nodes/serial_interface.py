@@ -144,6 +144,8 @@ class SerialInterface(Node):
             msg.position = [float(m.group(1)),float(m.group(2)),float(m.group(3)),float(m.group(4))]
             self.publisher.publish(msg)
 
+            self.get_logger().info(f"Sent message: {msg}")
+
         elif m := PATTERN_PH.match(line):
             ph = Float32()
             ph.data = adc_to_ph(m.group(1))
@@ -181,13 +183,11 @@ class SerialInterface(Node):
                     joint_id = 3
                 else:
                     self.get_logger().warn(f"Unknown joint: {msg.name}")
-                value = joint_values[i]
 
+                value = joint_values[i]
 
                 message = f"<DES_VAL:{joint_id},{round(value,1)}>\n"
                 self.ser.write(message.encode("utf-8"))
-
-                self.get_logger().info('Sent message: %s' % message)
 
     def destroy_node(self):
         self.ser.close()

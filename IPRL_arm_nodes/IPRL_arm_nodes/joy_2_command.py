@@ -35,7 +35,8 @@ class Joy2Command(Node):
         self.max_velocity = 50 #mm/s
         self.max_angular_speed = 15 #deg/s
         self.max_opening_speed = 3 #cm/s
-        self.movement_threshold = 4.5 #deg per call
+        self.movement_threshold = 0.1 #deg per call
+        # self.shoulder_offset = 0
 
         self.get_logger().info("Started joy_2_command node, waiting to read initial arm position")
 
@@ -58,18 +59,32 @@ class Joy2Command(Node):
             joint_names = []
             joint_values = []
 
-            # Construct message using value changes above threshold
-            for changed_joint in self.value_delta:
-                delta = self.value_delta[changed_joint]
-                joint_id = self.joint_names.index(changed_joint)
-                if ((changed_joint=="base") or (changed_joint=="grasp")): #base and grasp are special cases, already differential
-                    joint_names.append(changed_joint)
-                    joint_values.append(delta)
-                elif (((abs(delta) < self.movement_threshold) and (joint_id<4)) or (changed_joint=="roll" and delta==0)):
-                    pass # angle movement under threshold or no rotation time
-                else: #differential
-                    joint_names.append(changed_joint)
-                    joint_values.append(current_state[joint_id] + delta)
+            # Check if joint should be changed
+            for joint_name in self.joint_names:
+                # If joint actively being changed
+                if joint_name in self.value_delta:
+                    changed_joint = joint_name
+                    delta = self.value_delta[changed_joint]
+                    joint_id = self.joint_names.index(changed_joint)
+                    if ((changed_joint=="base") or (changed_joint=="grasp")): #base and grasp are special cases, already differential
+                        joint_names.append(changed_joint)
+                        joint_values.append(delta)
+                    elif (((abs(delta) < self.movement_threshold) and (joint_id<4)) or (changed_joint=="roll" and delta==0)):
+                        pass # angle movement under threshold or no rotation time
+                    else: #differential
+                        joint_names.append(changed_joint)
+                        joint_values.append(current_state[joint_id] + delta)
+                # If joint not actively changed
+                elif joint_name in self.prev_value_delta:
+                    if ((joint_name=="base") or (joint_name=="grasp")):
+                        joint_names.append(joint_name)
+                        joint_values.append(0)
+                    elif (joint_name=="roll"):
+                        pass
+                    else:
+                        joint_names.append(joint_name)
+                        joint_values.append(self.encoder_values[self.joint_names.index(joint_name)])
+
             if joint_names:
                 msg.name = joint_names
                 msg.position = joint_values
@@ -107,6 +122,12 @@ class Joy2Command(Node):
                     self.primed = True
                     self.get_logger().info("Arm is primed, ready to move")
                     self.get_logger().info("Initial values: %s" % str(self.arm.getCurrentAngles()))
+
+                    # Lock arm into original state on startup
+                    init_msg = JointState()
+                    init_msg.name = ["base", "shoulder", "elbow", "wrist"]
+                    init_msg.position = self.encoder_values[0:4]
+                    self.publisher_.publish(init_msg)
 
     def map_buttons(self, button_array):
         """ Maps buttons on controller to False if unpressed, True if pressed"""
