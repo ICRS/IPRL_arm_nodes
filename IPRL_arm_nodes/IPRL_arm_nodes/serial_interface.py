@@ -4,28 +4,39 @@ import serial
 import glob
 import time
 import re
+import threading
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Float32, Bool
 
-from sensor_msgs.msg import Joy, JointState
 
-import threading 
 PATTERN_ANG = re.compile(r"<CUR_ANG:([-+]?\d*\.\d+),([-+]?\d*\.\d+),([-+]?\d*\.\d+),([-+]?\d*\.\d+)>")
-PATTERN_PH = re.compile(r"<PH_PROBE:([-+]?\d*\.\d+)>")
+PATTERN_PH = re.compile(r"<PH_PROBE:(\d+)>")
+PATTERN_PONG = re.compile(r"<PONG:(\d+)>")
+
+
+def adc_to_ph(adc_reading: int){
+    """This function maps the 16-bit unsigned pH sensor ADC reading to an actual pH between 1 and 14"""
+    MAX_PH = 14.0
+    MIN_PH = 1.0
+    return float(adc_reading) * ((MAX_PH - MIN_PH) / (2**16-1)) + MIN_PH
+}
+
 
 class SerialInterface(Node):
-
-    PATTERN_PONG      = re.compile(r"<PONG:(\d+)>")
 
     def __init__(self):
         super().__init__('serial_interface')
 
         self.publisher = self.create_publisher(JointState, "read_joint_values", 2)
-        
+
         self.subscription = self.create_subscription(
             JointState,
             "set_joint_values",
             self.listener_callback,
             10)
-        self.subscription  # prevent unused variable warning
+        
+        self.ph_sub = self.create_subscription(Bool, "ph/request", self.ph_request, 10)
+        self.ph_pub = self.create_publisher(Float32, "ph/raw", 10)
 
         # Setup serial
         ports = sorted(glob.glob('/dev/ttyUSB*'))
@@ -98,7 +109,7 @@ class SerialInterface(Node):
                     line = line.strip()
 
                     # Check if the message is a PONG
-                    m = SerialInterface.PATTERN_PONG.match(line)
+                    m = PATTERN_PONG.match(line)
                     if m is not None:
 
                         device_id = int(m.group(1))
@@ -134,22 +145,29 @@ class SerialInterface(Node):
             self.publisher.publish(msg)
 
         elif m := PATTERN_PH.match(line):
-            self.get_logger().info("pH value: %s" % str(float(m.group(1))))
+            ph = Float32()
+            ph.data = adc_to_ph(m.group(1))
+            self.get_logger().info(f"pH value: {ph.data}")
+            self.ph_pub.publish(ph)
 
         else:
             self.get_logger().warn(f"Unknown line: {line}")
+        
+    def ph_request(self, msg: Bool):
+        if msg.data:
+            message = f"<PH_REQUEST:1>\n"
+            self.ser.write(message.encode("utf-8"))
+            self.get_logger().info(f"Sent message: {message}")
         
     def listener_callback(self, msg:JointState):
         # This implementation sends one command over Serial
         joint_names = msg.name
         joint_values = msg.position
 
-        # Send ph probe request
+        # Send pH probe request DEPRICATED
         if ("ph_probe") in joint_names:
-            message = f"<PH_REQUEST:>\n"
-            self.ser.write(message.encode("utf-8"))
+            self.get_logger().warn("THIS METHOD IS DEPRICATED: Send 'True' to 'arm/ph_request' to request a pH reading")
 
-            self.get_logger().info('Sent message: %s' % message)
         else:
             # Send joint value changes
             for i in range(len(joint_names)):
@@ -170,6 +188,11 @@ class SerialInterface(Node):
                 self.ser.write(message.encode("utf-8"))
 
                 self.get_logger().info('Sent message: %s' % message)
+
+    def destroy_node(self):
+        self.ser.close()
+        super().destroy_node()
+
 
 def main(args=None):
     rclpy.init(args=args)
