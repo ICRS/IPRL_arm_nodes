@@ -10,10 +10,10 @@ class pHNode(Node):
         super().__init__("ph_node")
 
         self.ph_raw_sub = self.create_subscription(Float32, "ph/raw", self.ph_measurement_received, 10)
-        self.ph_request_pub = self.create_publisher(Float32, "ph/request", 10)
+        self.ph_request_pub = self.create_publisher(Bool, "ph/request", 10)
 
         # Calibration topics and variables
-        self.ph_calibration_sub = self.create_subscription(Float32, "ph/calibrate", self.calibrate, 10)
+        self.ph_calibration_sub = self.create_subscription(Float32, "ph/calibrate", self.calibrate, 10)  # Unused. Could be used in future to add arbitrary calibration steps (other than 4 and 7)
         self.current_ph_actual = 0.0  # The buffer solution pH
         self.calibration_in_progress = False
         self.calibration_lut = {}  # Store the previous calibration results. This lookup table can be linearly extrapolated/interpolated to get the calibrated pH
@@ -31,7 +31,7 @@ class pHNode(Node):
         # Request a measurement
         to_send = Bool()
         to_send.data = True
-        self.ph_request_pub(to_send)
+        self.ph_request_pub.publish(to_send)
 
     def calibrate_four(self, request, response):
         msg = Float32()
@@ -116,7 +116,7 @@ class pHNode(Node):
         # Other measurement: apply calibration and publish
         else:
             to_send.data = self.apply_calibration(msg.data)
-            self.ph_calibrated_pub(to_send)
+            self.ph_calibrated_pub.publish(to_send)
 
 
 def main(args=None):

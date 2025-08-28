@@ -32,5 +32,11 @@ def generate_launch_description():
             executable='rviz2',
             name='arm_rviz',
             output='screen'
-        )
+        ),
+        Node(
+            package='IPRL_arm_nodes',
+            executable='ph',
+            name='arm_ph',
+            output='screen'
+        ),
     ])
