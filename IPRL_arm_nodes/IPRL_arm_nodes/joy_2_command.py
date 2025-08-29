@@ -36,7 +36,7 @@ class Joy2Command(Node):
         self.max_angular_speed = 15 #deg/s
         self.max_opening_speed = 3 #cm/s
         self.movement_threshold = 0.1 #deg per call
-        # self.shoulder_offset = 0
+        self.roll_speed = 10 #deg/s
 
         self.get_logger().info("Started joy_2_command node, waiting to read initial arm position")
 
@@ -76,11 +76,9 @@ class Joy2Command(Node):
                         joint_values.append(current_state[joint_id] + delta)
                 # If joint not actively changed
                 elif joint_name in self.prev_value_delta:
-                    if ((joint_name=="base") or (joint_name=="grasp")):
+                    if ((joint_name=="base") or (joint_name=="grasp") or (joint_name=="roll")):
                         joint_names.append(joint_name)
                         joint_values.append(0)
-                    elif (joint_name=="roll"):
-                        pass
                     else:
                         joint_names.append(joint_name)
                         joint_values.append(self.encoder_values[self.joint_names.index(joint_name)])
@@ -151,7 +149,7 @@ class Joy2Command(Node):
         axes_dict["Y"] = float(axes_array[1])
         axes_dict["Z"] = float(axes_array[7])
 
-        axes_dict["ROLL"] = float(axes_array[3])
+        axes_dict["ROLL"] = -1*float(axes_array[3])
         axes_dict["ENDPOINT_ANGLE"] = float(axes_array[4])
 
         return axes_dict
@@ -179,10 +177,9 @@ class Joy2Command(Node):
                     self.end_effector_incs = [axes_dict["Y"]*speed*self.max_velocity, axes_dict["Z"]*speed*self.max_velocity, axes_dict["ENDPOINT_ANGLE"]*speed*self.max_angular_speed]
 
                 # Wrist roll; affected by ROLL
-                # Value of new_state[4] is number of seconds to roll wrist, sense depending on sign
+                # Value of new_state[4] is speed to roll wrist, sense depending on sign
                 if (axes_dict["ROLL"]): 
-                    self.value_delta["roll"] = axes_dict["ROLL"]*self.timer_period*speed
-
+                    self.value_delta["roll"] = axes_dict["ROLL"]*speed*self.roll_speed
             # Grasp; affected by OPEN, CLOSE
             # Value of new_state[5] is speed gripper should open/close
             if (("grasp" in self.prev_value_delta) and (self.prev_value_delta["grasp"] != 0)):
