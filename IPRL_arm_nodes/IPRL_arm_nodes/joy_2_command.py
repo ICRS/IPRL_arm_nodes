@@ -34,7 +34,7 @@ class Joy2Command(Node):
         self.fast = 1
         self.max_velocity = 50 #mm/s
         self.max_angular_speed = 15 #deg/s
-        self.max_opening_speed = 3 #cm/s
+        self.max_opening_speed = 1 #cm/s
         self.movement_threshold = 0.1 #deg per call
         self.roll_speed = 10 #deg/s
 
@@ -66,10 +66,10 @@ class Joy2Command(Node):
                     changed_joint = joint_name
                     delta = self.value_delta[changed_joint]
                     joint_id = self.joint_names.index(changed_joint)
-                    if ((changed_joint=="base") or (changed_joint=="grasp")): #base and grasp are special cases, already differential
+                    if ((changed_joint=="base") or (changed_joint=="grasp")or (changed_joint=="roll")): #base and grasp are special cases, already differential
                         joint_names.append(changed_joint)
                         joint_values.append(delta)
-                    elif (((abs(delta) < self.movement_threshold) and (joint_id<4)) or (changed_joint=="roll" and delta==0)):
+                    elif ((abs(delta) < self.movement_threshold) and (joint_id<4)):
                         pass # angle movement under threshold or no rotation time
                     else: #differential
                         joint_names.append(changed_joint)
@@ -81,7 +81,7 @@ class Joy2Command(Node):
                         joint_values.append(0)
                     else:
                         joint_names.append(joint_name)
-                        joint_values.append(self.encoder_values[self.joint_names.index(joint_name)])
+                        joint_values.append(current_state[self.joint_names.index(joint_name)])
 
             if joint_names:
                 msg.name = joint_names
@@ -123,8 +123,11 @@ class Joy2Command(Node):
 
                     # Lock arm into original state on startup
                     init_msg = JointState()
-                    init_msg.name = ["base", "shoulder", "elbow", "wrist"]
-                    init_msg.position = self.encoder_values[0:4]
+                    init_msg.name = ["base", "shoulder", "elbow", "wrist", "roll", "grasp"]
+                    init_positions = self.encoder_values[0:4]
+                    init_positions.append(0)
+                    init_positions.append(0)
+                    init_msg.position = init_positions
                     self.publisher_.publish(init_msg)
 
     def map_buttons(self, button_array):
@@ -152,6 +155,16 @@ class Joy2Command(Node):
         axes_dict["ROLL"] = -1*float(axes_array[3])
         axes_dict["ENDPOINT_ANGLE"] = float(axes_array[4])
 
+        # Thresholding
+        if (abs(axes_dict["BASE"]) < 0.1):
+            axes_dict["BASE"] = 0
+        if (abs(axes_dict["Y"]) < 0.1):
+            axes_dict["Y"] = 0
+        if (abs(axes_dict["ROLL"]) < 0.1):
+            axes_dict["ROLL"] = 0
+        if (abs(axes_dict["ENDPOINT_ANGLE"]) < 0.1):
+            axes_dict["ENDPOINT_ANGLE"] = 0
+
         return axes_dict
 
     def controller_callback(self, msg):
@@ -178,8 +191,12 @@ class Joy2Command(Node):
 
                 # Wrist roll; affected by ROLL
                 # Value of new_state[4] is speed to roll wrist, sense depending on sign
-                if (axes_dict["ROLL"]): 
-                    self.value_delta["roll"] = axes_dict["ROLL"]*speed*self.roll_speed
+                if (axes_dict["ROLL"]):
+                    if (axes_dict["ROLL"] > 0):
+                        self.value_delta["roll"] = self.roll_speed
+                    else:
+                        self.value_delta["roll"] = -1*self.roll_speed
+
             # Grasp; affected by OPEN, CLOSE
             # Value of new_state[5] is speed gripper should open/close
             if (("grasp" in self.prev_value_delta) and (self.prev_value_delta["grasp"] != 0)):

@@ -144,7 +144,7 @@ class SerialInterface(Node):
             msg.position = [float(m.group(1)),float(m.group(2)),float(m.group(3)),float(m.group(4))]
             self.publisher.publish(msg)
 
-            self.get_logger().info(f"Publishing received angles: {msg}")
+            #self.get_logger().info(f"Publishing received angles: {msg}")
 
         elif m := PATTERN_PH.match(line):
             ph = Float32()
@@ -170,28 +170,43 @@ class SerialInterface(Node):
         if ("ph_probe") in joint_names:
             self.get_logger().warn("THIS METHOD IS DEPRICATED: Send 'True' to 'arm/ph_request' to request a pH reading")
 
-        else:
-            # Send joint value changes
-            for i in range(len(joint_names)):
-                if joint_names[i] == "base":
-                    joint_id = 0
-                elif joint_names[i]  == "shoulder":
-                    joint_id = 1
-                elif joint_names[i]  == "elbow":
-                    joint_id = 2
-                elif joint_names[i]  == "wrist":
-                    joint_id = 3
-                elif joint_names[i] == "roll":
-                    joint_id = 4
-                elif joint_names[i] == "grasp":
-                    joint_id = 5
-                else:
-                    self.get_logger().warn(f"Unknown joint: {msg.name}")
+        # # Stop grasp from moving when not asked to
+        # if "grasp" not in joint_names:
+        #     message = f"<DES_VAL:5,0>\n"
+        #     self.ser.write(message.encode("utf-8"))
 
-                value = joint_values[i]
+        #     self.get_logger().info(f"Wrote to serial: {message}")
+        # # Stop roll from moving when not asked to
+        # if "roll" not in joint_names:
+        #     message = f"<DES_VAL:4,0>\n"
+        #     self.ser.write(message.encode("utf-8"))
 
+        #     self.get_logger().info(f"Wrote to serial: {message}")
+
+        # Send joint value changes
+        for i in range(len(joint_names)):
+            if joint_names[i] == "base":
+                joint_id = 0
+            elif joint_names[i]  == "shoulder":
+                joint_id = 1
+            elif joint_names[i]  == "elbow":
+                joint_id = 2
+            elif joint_names[i]  == "wrist":
+                joint_id = 3
+            elif joint_names[i] == "roll":
+                joint_id = 4
+            elif joint_names[i] == "grasp":
+                joint_id = 5
+            else:
+                self.get_logger().warn(f"Unknown joint: {msg.name}")
+
+            value = joint_values[i]
+
+            if (joint_id <=3):
                 message = f"<DES_VAL:{joint_id},{round(value,1)}>\n"
                 self.ser.write(message.encode("utf-8"))
+
+                self.get_logger().info(f"Wrote to serial: {message}")
 
     def destroy_node(self):
         self.ser.close()
