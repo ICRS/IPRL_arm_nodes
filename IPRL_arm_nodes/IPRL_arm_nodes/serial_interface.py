@@ -144,7 +144,7 @@ class SerialInterface(Node):
             msg.position = [float(m.group(1)),float(m.group(2)),float(m.group(3)),float(m.group(4))]
             self.publisher.publish(msg)
 
-            self.get_logger().info(f"Sent message: {msg}")
+            self.get_logger().info(f"Publishing received angles: {msg}")
 
         elif m := PATTERN_PH.match(line):
             ph = Float32()
@@ -181,6 +181,10 @@ class SerialInterface(Node):
                     joint_id = 2
                 elif joint_names[i]  == "wrist":
                     joint_id = 3
+                elif joint_names[i] == "roll":
+                    joint_id = 4
+                elif joint_names[i] == "grasp":
+                    joint_id = 5
                 else:
                     self.get_logger().warn(f"Unknown joint: {msg.name}")
 
