@@ -15,10 +15,4 @@ def generate_launch_description():
             name='arm_bridge',
             output='screen'
         ),
-        Node(
-            package='joy',
-            executable='joy_node',
-            name='arm_joy',
-            remappings=[("/joy","/arm/joy")],
-        ),
     ])
