@@ -61,7 +61,7 @@ class ArmVisualiser(Node):
         # Arm vars
         self.joint_names = ["map","base","shoulder","elbow","wrist","roll","grasp"]
         self.joint_states = [0, -90, 90, 0, 0, 0] # theta1, theta2, theta3, theta4, theta5
-        self.link_lengths = [0, 0.1, 0.325, 0.33, 0.195, 0, 0] # in m
+        self.link_lengths = [0, 0.1, 0.325, 0.33, 0.265, 0, 0] # in m
 
         mode = "normal"
         if self.debug_mode:
