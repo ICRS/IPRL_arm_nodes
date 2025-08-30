@@ -15,4 +15,10 @@ def generate_launch_description():
             name='arm_bridge',
             output='screen'
         ),
+        Node(
+            package='IPRL_arm_nodes',
+            executable='ph',
+            name='ph',
+            output='screen'
+        ),
     ])
