@@ -14,7 +14,7 @@ class Arm():
         # Physical parameters of arm.
         self.upperArmLength = 325
         self.foreArmLength = 330
-        self.gripperLength = 265
+        self.gripperLength = 290
 
         # Current angles (update via encoders)
         self.currentAngleBase = initialJointAngles[0]
