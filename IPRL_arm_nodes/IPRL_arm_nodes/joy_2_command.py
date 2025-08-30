@@ -37,6 +37,7 @@ class Joy2Command(Node):
         self.max_opening_speed = 2 #cm/s
         self.movement_threshold = 0.1 #deg per call
         self.roll_speed = 10 #deg/s
+        self.shoulder_speed = 5 #deg/s
 
         self.get_logger().info("Started joy_2_command node, waiting to read initial arm position")
 
@@ -52,7 +53,8 @@ class Joy2Command(Node):
                 new_SEW = self.arm.IK2D(self.end_effector_incs[0], self.end_effector_incs[1], self.end_effector_incs[2])
                 for i in range (0,len(new_SEW)):
                     name = self.joint_names[i+1]
-                    self.value_delta[name] = new_SEW[i]-current_state[i+1]
+                    self.value_delta[name] = 0
+                    self.value_delta[name] = self.value_delta[name]+new_SEW[i]-current_state[i+1] # Account for manual joint changes
 
             # Init joint message
             msg = JointState()
@@ -139,6 +141,9 @@ class Joy2Command(Node):
 
         button_dict["PH"] = bool(button_array[2])
 
+        button_dict["SHOULDER_CLOCKWISE"] = bool(button_array[3])
+        button_dict["SHOULDER_ANTICLOCKWISE"] = bool(button_array[0])
+
         return button_dict
 
     def map_axes(self, axes_array):
@@ -188,6 +193,12 @@ class Joy2Command(Node):
                 # Value of new_state[1:2] is absolute angle to move to
                 if ((axes_dict["Z"] != 0) | (axes_dict["Y"] != 0) | (axes_dict["ENDPOINT_ANGLE"] != 0)):
                     self.end_effector_incs = [axes_dict["Y"]*speed*self.max_velocity, axes_dict["Z"]*speed*self.max_velocity, axes_dict["ENDPOINT_ANGLE"]*speed*self.max_angular_speed]
+
+                # Additionally, if shoulder angle button pressed, increment shoulder angle
+                if (buttons_dict["SHOULDER_CLOCKWISE"]):
+                    self.value_delta["shoulder"] = speed*self.shoulder_speed
+                elif (buttons_dict["SHOULDER_ANTICLOCKWISE"]):
+                    self.value_delta["shoulder"] = -1*speed*self.shoulder_speed
 
                 # Wrist roll; affected by ROLL
                 # Value of new_state[4] is speed to roll wrist, sense depending on sign
