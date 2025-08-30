@@ -41,8 +41,8 @@ class SerialInterface(Node):
         # Setup serial
         ports = sorted(glob.glob('/dev/ttyUSB*'))
         if not ports:
-            self.get_logger().error("No /dev/ttyACM* devices found.")
-            raise RuntimeError("No ACM serial device found.")
+            self.get_logger().error("No /dev/ttyUSB* devices found.")
+            raise RuntimeError("No USB serial device found.")
         self.ser = None
 
         # Get the port
@@ -52,7 +52,7 @@ class SerialInterface(Node):
             for port in ports:
                 try:
                     self.get_logger().info(f"Trying serial port: {port}")
-                    self.ser = serial.Serial('/dev/ttyUSB0', self.baud_rate) #TODO: CHANGE BACK TO ACM0
+                    self.ser = serial.Serial(port, self.baud_rate) #TODO: CHANGE BACK TO ACM0
                     time.sleep(2)  # give device time to reset if needed
                     self.get_logger().info(f"Connected to {port}")
                 except serial.SerialException as e:
@@ -191,7 +191,7 @@ class SerialInterface(Node):
 
             value = joint_values[i]
 
-            if (joint_id <=3):
+            if (joint_id <=5):
                 message = f"<DES_VAL:{joint_id},{round(value,1)}>\n"
                 self.ser.write(message.encode("utf-8"))
 
