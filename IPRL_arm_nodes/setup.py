@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('lib/' + package_name, [package_name + '/arm_utilities.py']),
-        ('share/' + package_name + '/launch', ['launch/IPRL_arm_launch_debug.py']),
+        ('share/' + package_name + '/launch', ['launch/arm.py']),
 
     ],
     install_requires=['setuptools'],
