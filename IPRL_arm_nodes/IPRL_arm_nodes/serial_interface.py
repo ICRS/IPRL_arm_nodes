@@ -170,17 +170,6 @@ class SerialInterface(Node):
         if ("ph_probe") in joint_names:
             self.get_logger().warn("THIS METHOD IS DEPRICATED: Send 'True' to 'arm/ph_request' to request a pH reading")
 
-        # # Stop grasp from moving when not asked to
-        # if "grasp" not in joint_names:
-        #     message = f"<DES_VAL:5,0>\n"
-        #     self.ser.write(message.encode("utf-8"))
-
-        #     self.get_logger().info(f"Wrote to serial: {message}")
-        # # Stop roll from moving when not asked to
-        # if "roll" not in joint_names:
-        #     message = f"<DES_VAL:4,0>\n"
-        #     self.ser.write(message.encode("utf-8"))
-
         #     self.get_logger().info(f"Wrote to serial: {message}")
 
         # Send joint value changes
