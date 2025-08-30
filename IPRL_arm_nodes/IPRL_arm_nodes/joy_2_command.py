@@ -34,7 +34,7 @@ class Joy2Command(Node):
         self.fast = 1
         self.max_velocity = 50 #mm/s
         self.max_angular_speed = 15 #deg/s
-        self.max_opening_speed = 1 #cm/s
+        self.max_opening_speed = 2 #cm/s
         self.movement_threshold = 0.1 #deg per call
         self.roll_speed = 10 #deg/s
 
