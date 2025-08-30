@@ -187,7 +187,7 @@ class Joy2Command(Node):
                 # Check for base rotation; affected by BASE
                 # Value of new_state[0] is change in base angle about horizontal
                 if axes_dict["BASE"] != 0:
-                    self.value_delta["base"] = axes_dict["BASE"]*speed*self.max_angular_speed
+                    self.value_delta["base"] = -1*axes_dict["BASE"]*speed*self.max_angular_speed
                 
                 # Find new IK angles; affected by Z, Y, ENDPOINT_ANGLE
                 # Value of new_state[1:2] is absolute angle to move to
