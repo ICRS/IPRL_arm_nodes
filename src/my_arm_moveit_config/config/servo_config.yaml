@@ -1,0 +1,55 @@
+###############################################
+# MoveIt Servo Configuration
+###############################################
+
+# --- CRITICAL FRAME DEFINITIONS (MISSING IN YOUR FILE) ---
+# The reference frame for your joystick commands (usually 'base_link' or 'world')
+planning_frame: base_link
+
+# The specific link you want to move (the tip of your arm)
+# CHECK YOUR URDF: If your last link is 'link_5' or 'gripper', change this!
+ee_frame_name: link_4
+
+# The frame the robot commands should be calculated in (usually same as planning_frame)
+robot_link_command_frame: base_link
+
+# --- GENERAL CONFIG ---
+move_group_name: arm  # Must match the group name in your SRDF
+command_in_type: "speed_units" # "unitless" or "speed_units"
+
+
+scale:
+  # Scale parameters are proportional to the max velocity of the robot
+  linear:  0.9  # Max linear velocity (m/s)
+  rotational: 1.0 # Max angular velocity (rad/s)
+  # Joint jogging settings
+  joint: 0.01
+
+# scale:
+#   # Scale parameters are proportional to the max velocity of the robot
+#   linear:  0.4  # Max linear velocity (m/s)
+#   rotational: 0.8 # Max angular velocity (rad/s)
+#   # Joint jogging settings
+#   joint: 0.01
+
+# --- TOPICS ---
+cartesian_command_in_topic: /servo_node/delta_twist_cmds
+joint_command_in_topic: /delta_joint_cmds
+status_topic: /servo_server/status
+command_out_topic: /arm_controller/joint_trajectory
+
+# --- COLLISION CHECKING ---
+# Kept 'false' as requested for debugging.
+check_collisions: false
+collision_check_rate: 10.0 # Hz
+collision_check_type: "threshold_distance"
+self_collision_proximity_threshold: 0.01
+scene_collision_proximity_threshold: 0.02
+
+# --- SAFETY & TIMING ---
+incoming_command_timeout: 0.1 # Stop if joystick disconnects
+smoothing_filter_coeff: 2.0   # Higher = smoother but more lag
+
+# --- PUBLISHING ---
+publish_period: 0.01 # ~100Hz. Important to match or be slightly faster than controller
+low_latency_mode: true
