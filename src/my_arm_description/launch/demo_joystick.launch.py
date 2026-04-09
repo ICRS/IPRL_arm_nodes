@@ -137,7 +137,7 @@ def generate_launch_description():
     # 5. CONTROLLER SPAWNERS (CRITICAL FIX)
     # ==========================================
     # These "turn on" the controllers defined in your YAML
-    
+
     # Spawns 'joint_state_broadcaster' (Publishers joint angles to TF)
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
@@ -152,6 +152,18 @@ def generate_launch_description():
         arguments=["arm_controller", "--controller-manager", "/controller_manager"],
     )
 
+    # Spawns 'gripper_controller' (Enables gripper trajectory execution)
+    gripper_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["gripper_controller", "--controller-manager", "/controller_manager"],
+    )
+
+    start_servo_event = ExecuteProcess(
+        cmd=['ros2', 'service', 'call', '/servo_node/start_servo', 'std_srvs/srv/Trigger', '{}'],
+        output='screen'
+    )
+
     # Delay RViz start until the robot is ready (Clean startup)
     delay_rviz = RegisterEventHandler(
         event_handler=OnProcessExit(
@@ -160,15 +172,10 @@ def generate_launch_description():
         )
     )
 
-    start_servo_event = ExecuteProcess(
-        cmd=['ros2', 'service', 'call', '/servo_node/start_servo', 'std_srvs/srv/Trigger', '{}'],
-        output='screen'
-    )
-    
-    # Delay the start command by 5 seconds to ensure Servo is fully loaded first
+    # Delay the start command until controller startup has begun.
     delayed_start_servo = RegisterEventHandler(
         event_handler=OnProcessExit(
-            target_action=joint_state_broadcaster_spawner, # Wait for controllers to start
+            target_action=joint_state_broadcaster_spawner,
             on_exit=[start_servo_event],
         )
     )
@@ -181,6 +188,7 @@ def generate_launch_description():
         ros2_control_node,
         joint_state_broadcaster_spawner,
         arm_controller_spawner,
+        gripper_controller_spawner,
         delay_rviz,
         delayed_start_servo
     ])

@@ -9,6 +9,8 @@
 
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
+  <depend>control_msgs</depend>
+  <depend>trajectory_msgs</depend>
   <depend>urdf</depend>
   <depend>xacro</depend>
 

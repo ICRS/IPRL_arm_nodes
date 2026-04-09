@@ -89,6 +89,54 @@
     </collision>
   </link>
 
+  <link name="link_5">
+    <visual>
+      <geometry>
+        <cylinder length="0.02" radius="0.03"/>
+      </geometry>
+      <origin xyz="0 0 0.01" rpy="0 0 0"/>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="0.02" radius="0.03"/>
+      </geometry>
+      <origin xyz="0 0 0.01" rpy="0 0 0"/>
+    </collision>
+  </link>
+
+  <link name="left_finger">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.06"/>
+      </geometry>
+      <origin xyz="0 0 0.03" rpy="0 0 0"/>
+      <material name="orange"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.01 0.01 0.06"/>
+      </geometry>
+      <origin xyz="0 0 0.03" rpy="0 0 0"/>
+    </collision>
+  </link>
+
+  <link name="right_finger">
+    <visual>
+      <geometry>
+        <box size="0.01 0.01 0.06"/>
+      </geometry>
+      <origin xyz="0 0 0.03" rpy="0 0 0"/>
+      <material name="orange"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.01 0.01 0.06"/>
+      </geometry>
+      <origin xyz="0 0 0.03" rpy="0 0 0"/>
+    </collision>
+  </link>
+
   <joint name="joint_1" type="revolute">
     <parent link="base_link"/>
     <child link="link_1"/>
@@ -105,7 +153,7 @@
     <limit lower="-1.57" upper="1.57" effort="200" velocity="0.6"/>
   </joint>
 
-<joint name="joint_3" type="revolute">
+  <joint name="joint_3" type="revolute">
     <parent link="link_2"/>
     <child link="link_3"/>
     <origin xyz="0 0 0.4" rpy="0 0 0"/>
@@ -119,6 +167,31 @@
     <origin xyz="0 0 0.4" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
     <limit lower="-3.14" upper="3.14" effort="50" velocity="2.0"/>
+  </joint>
+
+  <joint name="joint_5" type="revolute">
+    <parent link="link_4"/>
+    <child link="link_5"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14" upper="3.14" effort="50" velocity="2.0"/>
+  </joint>
+
+  <joint name="gripper_joint" type="prismatic">
+    <parent link="link_5"/>
+    <child link="left_finger"/>
+    <origin xyz="0 0.015 0.02" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="0.0" upper="0.03" effort="20" velocity="0.5"/>
+  </joint>
+
+  <joint name="right_finger_joint" type="prismatic">
+    <parent link="link_5"/>
+    <child link="right_finger"/>
+    <origin xyz="0 -0.015 0.02" rpy="0 0 0"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="0.0" upper="0.03" effort="20" velocity="0.5"/>
+    <mimic joint="gripper_joint" multiplier="1.0"/>
   </joint>
 
 </robot>
