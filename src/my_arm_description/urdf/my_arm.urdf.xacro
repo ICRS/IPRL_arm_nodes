@@ -121,31 +121,4 @@
     <limit lower="-3.14" upper="3.14" effort="50" velocity="2.0"/>
   </joint>
 
-  <ros2_control name="MyRobotSystem" type="system">
-    <hardware>
-        <plugin>mock_components/GenericSystem</plugin>
-    </hardware>
-    
-    <joint name="joint_1">
-      <command_interface name="position"/>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="joint_2">
-      <command_interface name="position"/>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="joint_3">
-      <command_interface name="position"/>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="joint_4">
-      <command_interface name="position"/>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-  </ros2_control>
-
 </robot>

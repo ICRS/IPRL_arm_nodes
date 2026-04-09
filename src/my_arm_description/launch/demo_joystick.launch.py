@@ -38,21 +38,23 @@ def generate_launch_description():
     if servo_yaml is None or kin_yaml is None:
         return LaunchDescription([])
     
+    robot_description_kinematics = {'robot_description_kinematics': kin_yaml}
     servo_params = {
-    'moveit_servo': servo_yaml,
-    'move_group_name': 'arm',
-    'robot_description_kinematics': kin_yaml  # Nesting the dictionary here
-}
+        'moveit_servo': servo_yaml,
+        'move_group_name': 'arm',
+    }
     # ==========================================
     # 2. ROBOT DESCRIPTION (URDF & SRDF)
     # ==========================================
     # We use ParameterValue(..., value_type=str) to fix the YAML parsing error
     
-    # URDF
+    # URDF from MoveIt config package so ros2_control initial positions are applied.
+    initial_positions_path = PathJoinSubstitution([FindPackageShare(moveit_pkg), "config", "initial_positions.yaml"])
     robot_description_content = Command(
         [
             PathJoinSubstitution([FindExecutable(name="xacro")]), " ",
-            PathJoinSubstitution([FindPackageShare(description_pkg), "urdf", "my_arm.urdf.xacro"]),
+            PathJoinSubstitution([FindPackageShare(moveit_pkg), "config", "my_arm.urdf.xacro"]), " ",
+            "initial_positions_file:=", initial_positions_path,
         ]
     )
     robot_description = {"robot_description": ParameterValue(robot_description_content, value_type=str)}
@@ -101,7 +103,7 @@ def generate_launch_description():
     servo_node = Node(
         package='moveit_servo',
         executable='servo_node_main',
-        parameters=[servo_params, robot_description, robot_description_semantic],
+        parameters=[servo_params, robot_description, robot_description_semantic, robot_description_kinematics],
         output='screen',
     )
 
@@ -112,7 +114,7 @@ def generate_launch_description():
         name='rviz2',
         output='log',
         arguments=['-d', rviz_config_path],
-        parameters=[robot_description, robot_description_semantic]
+        parameters=[robot_description, robot_description_semantic, robot_description_kinematics]
     )
 
     # E. Robot State Publisher (Publishes TF frames)
