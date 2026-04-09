@@ -12,7 +12,7 @@ from sensor_msgs.msg import Joy
 DEVICE_PATH = '/dev/input/event0'
 
 # You confirmed these:
-HW_CODE_DEADMAN = 309  # Your Deadman Button RIGHT TRIGGER
+HW_CODE_DEADMAN = 309  # Your Deadman Button RIGHT BUMPER
 HW_CODE_Z_AXIS  = 5    # Your Z Axis (Right Stick Vertical?)
 
 # Standard event codes (Verify these if X/Y move wrongly)
