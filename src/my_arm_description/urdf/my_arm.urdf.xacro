@@ -1,5 +1,8 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="my_arm">
+  <xacro:arg name="use_mock_hardware" default="false" />
+  <xacro:arg name="include_ros2_control" default="false" />
+  <xacro:property name="use_mock" value="$(arg use_mock_hardware)"/>
 
   <material name="blue">
     <color rgba="0 0 0.8 1"/>
@@ -44,32 +47,32 @@
   <link name="link_2">
     <visual>
       <geometry>
-        <cylinder length="0.4" radius="0.025"/>
+        <cylinder length="0.405" radius="0.025"/>
       </geometry>
-      <origin xyz="0 0 0.2" rpy="0 0 0"/>
+      <origin xyz="0 0 0.2025" rpy="0 0 0"/>
       <material name="orange"/>
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.4" radius="0.025"/>
+        <cylinder length="0.405" radius="0.025"/>
       </geometry>
-      <origin xyz="0 0 0.2" rpy="0 0 0"/>
+      <origin xyz="0 0 0.2025" rpy="0 0 0"/>
     </collision>
   </link>
 
   <link name="link_3">
     <visual>
       <geometry>
-        <cylinder length="0.4" radius="0.015"/>
+        <cylinder length="0.345" radius="0.015"/>
       </geometry>
-      <origin xyz="0 0 0.2" rpy="0 0 0"/>
+      <origin xyz="0 0 0.1725" rpy="0 0 0"/>
       <material name="blue"/>
     </visual>
     <collision>
       <geometry>
-        <cylinder length="0.4" radius="0.015"/>
+        <cylinder length="0.345" radius="0.015"/>
       </geometry>
-      <origin xyz="0 0 0.2" rpy="0 0 0"/>
+      <origin xyz="0 0 0.1725" rpy="0 0 0"/>
     </collision>
   </link>
 
@@ -94,7 +97,7 @@
     <child link="link_1"/>
     <origin xyz="0 0 0.025" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-3.14" upper="3.14" effort="100" velocity="1.0"/>
+    <limit lower="0.0" upper="6.283185" effort="100" velocity="1.0"/>
   </joint>
 
   <joint name="joint_2" type="revolute">
@@ -102,50 +105,78 @@
     <child link="link_2"/>
     <origin xyz="0 0 0.1" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-1.57" upper="1.57" effort="200" velocity="0.6"/>
+    <limit lower="-1.570796" upper="1.221730" effort="200" velocity="0.6"/>
   </joint>
 
-<joint name="joint_3" type="revolute">
+  <joint name="joint_3" type="revolute">
     <parent link="link_2"/>
     <child link="link_3"/>
-    <origin xyz="0 0 0.4" rpy="0 0 0"/>
+    <origin xyz="0 0 0.405" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-2.5" upper="2.5" effort="100" velocity="0.26"/>
+    <limit lower="-3.141593" upper="0.0" effort="100" velocity="0.26"/>
   </joint>
 
   <joint name="joint_4" type="revolute">
     <parent link="link_3"/>
     <child link="link_4"/>
-    <origin xyz="0 0 0.4" rpy="0 0 0"/>
+    <origin xyz="0 0 0.345" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
     <limit lower="-3.14" upper="3.14" effort="50" velocity="2.0"/>
   </joint>
 
-  <ros2_control name="MyRobotSystem" type="system">
-    <hardware>
-        <plugin>mock_components/GenericSystem</plugin>
-    </hardware>
-    
-    <joint name="joint_1">
-      <command_interface name="position"/>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="joint_2">
-      <command_interface name="position"/>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="joint_3">
-      <command_interface name="position"/>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="joint_4">
-      <command_interface name="position"/>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-  </ros2_control>
+  <xacro:if value="$(arg include_ros2_control)">
+    <ros2_control name="MyRobotSystem" type="system">
+      <hardware>
+          <xacro:if value="${use_mock}">
+            <plugin>mock_components/GenericSystem</plugin>
+          </xacro:if>
+          <xacro:unless value="${use_mock}">
+            <plugin>my_arm_hardware/Esp32SerialHardware</plugin>
+            <param name="port">/dev/ttyUSB0</param>
+            <param name="baud_rate">115200</param>
+            <param name="real_joints">3</param>
+            <param name="id_offset">0</param>
+            <param name="query_period_ms">50</param>
+            <param name="poll_cur_ang">false</param>
+            <param name="stream_list_mode">true</param>
+            <param name="stream_without_id">false</param>
+            <param name="wait_for_first_state">true</param>
+            <param name="state_timeout_ms">1000</param>
+            <param name="ping_on_activate">true</param>
+            <param name="ping_id">50</param>
+            <param name="ping_timeout_ms">300</param>
+            <param name="joint_1_min_deg">0</param>
+            <param name="joint_1_max_deg">360</param>
+            <param name="joint_2_min_deg">0</param>
+            <param name="joint_2_max_deg">160</param>
+            <param name="joint_1_offset_deg">0</param>
+            <param name="joint_2_offset_deg">-90</param>
+            <param name="joint_3_offset_deg">-90</param>
+            <param name="joint_4_offset_deg">0</param>
+          </xacro:unless>
+      </hardware>
+
+      <joint name="joint_1">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="joint_2">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="joint_3">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="joint_4">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+    </ros2_control>
+  </xacro:if>
 
 </robot>

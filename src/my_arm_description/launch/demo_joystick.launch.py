@@ -1,8 +1,8 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import ExecuteProcess, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
-from launch.substitutions import Command, PathJoinSubstitution, FindExecutable
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution, FindExecutable
 from launch_ros.substitutions import FindPackageShare
 from launch_ros.parameter_descriptions import ParameterValue
 import os
@@ -30,6 +30,8 @@ def generate_launch_description():
     description_pkg = 'my_arm_description'
     moveit_pkg      = 'my_arm_moveit_config'
 
+    use_mock_hardware = LaunchConfiguration('use_mock_hardware')
+
     # Load Servo Config (Ensuring we use the name you confirmed: servo_config.yaml)
     servo_yaml = load_yaml(moveit_pkg, 'config/servo_config.yaml')
     kin_yaml = load_yaml(moveit_pkg, 'config/kinematics.yaml')
@@ -53,6 +55,7 @@ def generate_launch_description():
         [
             PathJoinSubstitution([FindExecutable(name="xacro")]), " ",
             PathJoinSubstitution([FindPackageShare(description_pkg), "urdf", "my_arm.urdf.xacro"]),
+            " ", "use_mock_hardware:=", use_mock_hardware,
         ]
     )
     robot_description = {"robot_description": ParameterValue(robot_description_content, value_type=str)}
@@ -172,6 +175,11 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'use_mock_hardware',
+            default_value='false',
+            description='Use mock ros2_control hardware instead of the ESP32 serial hardware.'
+        ),
         joy_driver_node,
         teleop_node,
         servo_node,

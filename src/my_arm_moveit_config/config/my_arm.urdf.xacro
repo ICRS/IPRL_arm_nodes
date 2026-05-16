@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="my_arm">
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
+    <xacro:arg name="use_mock_hardware" default="false" />
 
     <!-- Import my_arm urdf file -->
     <xacro:include filename="$(find my_arm_description)/urdf/my_arm.urdf.xacro" />
@@ -9,6 +10,9 @@
     <xacro:include filename="my_arm.ros2_control.xacro" />
 
 
-    <xacro:my_arm_ros2_control name="FakeSystem" initial_positions_file="$(arg initial_positions_file)"/>
+    <xacro:my_arm_ros2_control
+        name="FakeSystem"
+        initial_positions_file="$(arg initial_positions_file)"
+        use_mock_hardware="$(arg use_mock_hardware)"/>
 
 </robot>

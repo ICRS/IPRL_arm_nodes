@@ -1,19 +1,18 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>my_arm_description</name>
+  <name>my_arm_serial_bridge</name>
   <version>0.0.0</version>
-  <description>Package for Arm Control and Description</description>
+  <description>Raw serial bridge for ESP32 arm testing</description>
   <maintainer email="sosebeyo@gmail.com">samuel</maintainer>
   <license>TODO: License declaration</license>
 
   <depend>rclpy</depend>
-  <depend>sensor_msgs</depend>
-  <depend>urdf</depend>
-  <depend>xacro</depend>
+  <depend>std_msgs</depend>
 
-  <exec_depend>python3-evdev</exec_depend>
-  <exec_depend>my_arm_hardware</exec_depend>
+  <exec_depend>python3-serial</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

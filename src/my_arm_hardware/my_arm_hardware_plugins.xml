@@ -1,0 +1,10 @@
+<library path="libmy_arm_hardware">
+  <class
+      name="my_arm_hardware/Esp32SerialHardware"
+      type="my_arm_hardware::Esp32SerialHardware"
+      base_class_type="hardware_interface::SystemInterface">
+    <description>
+      ESP32 serial hardware interface for my_arm.
+    </description>
+  </class>
+</library>

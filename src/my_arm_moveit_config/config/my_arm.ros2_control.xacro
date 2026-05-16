@@ -1,36 +1,66 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="my_arm_ros2_control" params="name initial_positions_file">
+    <xacro:macro name="my_arm_ros2_control" params="name initial_positions_file use_mock_hardware">
         <xacro:property name="initial_positions" value="${load_yaml(initial_positions_file)['initial_positions']}"/>
+      <xacro:property name="use_mock" value="${use_mock_hardware}"/>
 
         <ros2_control name="${name}" type="system">
             <hardware>
-                <!-- By default, set up controllers for simulation. This won't work on real hardware -->
-                <plugin>mock_components/GenericSystem</plugin>
+          <xacro:if value="${use_mock}">
+            <plugin>mock_components/GenericSystem</plugin>
+          </xacro:if>
+          <xacro:unless value="${use_mock}">
+            <plugin>my_arm_hardware/Esp32SerialHardware</plugin>
+            <param name="port">/dev/ttyUSB0</param>
+            <param name="baud_rate">115200</param>
+                    <param name="real_joints">3</param>
+                    <param name="id_offset">0</param>
+            <param name="query_period_ms">50</param>
+                    <param name="poll_cur_ang">false</param>
+                    <param name="stream_list_mode">true</param>
+                    <param name="stream_without_id">false</param>
+                    <param name="wait_for_first_state">true</param>
+                    <param name="state_timeout_ms">1000</param>
+            <param name="ping_on_activate">true</param>
+                    <param name="ping_id">50</param>
+            <param name="ping_timeout_ms">300</param>
+            <param name="joint_1_min_deg">0</param>
+            <param name="joint_1_max_deg">360</param>
+            <param name="joint_2_min_deg">0</param>
+            <param name="joint_2_max_deg">160</param>
+            <param name="joint_1_offset_deg">0</param>
+            <param name="joint_2_offset_deg">-90</param>
+            <param name="joint_3_offset_deg">-90</param>
+            <param name="joint_4_offset_deg">0</param>
+          </xacro:unless>
             </hardware>
             <joint name="joint_1">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['joint_1']}</param>
                 </state_interface>
+                <state_interface name="velocity"/>
             </joint>
             <joint name="joint_2">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['joint_2']}</param>
                 </state_interface>
+                <state_interface name="velocity"/>
             </joint>
             <joint name="joint_3">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['joint_3']}</param>
                 </state_interface>
+                <state_interface name="velocity"/>
             </joint>
             <joint name="joint_4">
                 <command_interface name="position"/>
                 <state_interface name="position">
                   <param name="initial_value">${initial_positions['joint_4']}</param>
                 </state_interface>
+                <state_interface name="velocity"/>
             </joint>
 
         </ros2_control>
