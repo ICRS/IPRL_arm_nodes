@@ -56,6 +56,10 @@ def generate_launch_description():
             PathJoinSubstitution([FindExecutable(name="xacro")]), " ",
             PathJoinSubstitution([FindPackageShare(description_pkg), "urdf", "my_arm.urdf.xacro"]),
             " ", "use_mock_hardware:=", use_mock_hardware,
+            " ", "include_ros2_control:=", "true",
+            " ", "initial_positions_file:=", PathJoinSubstitution(
+                [FindPackageShare(moveit_pkg), "config", "initial_positions.yaml"]
+            ),
         ]
     )
     robot_description = {"robot_description": ParameterValue(robot_description_content, value_type=str)}
@@ -115,7 +119,7 @@ def generate_launch_description():
         name='rviz2',
         output='log',
         arguments=['-d', rviz_config_path],
-        parameters=[robot_description, robot_description_semantic]
+        parameters=[robot_description, robot_description_semantic, {'robot_description_kinematics': kin_yaml}]
     )
 
     # E. Robot State Publisher (Publishes TF frames)

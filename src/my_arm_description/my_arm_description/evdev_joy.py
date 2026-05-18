@@ -12,7 +12,10 @@ from sensor_msgs.msg import Joy
 DEVICE_PATH = '/dev/input/event0'
 
 # You confirmed these:
-HW_CODE_DEADMAN = 309  # Your Deadman Button RIGHT TRIGGER
+# Deadman can be a button (EV_KEY) or an axis (EV_ABS).
+HW_CODE_DEADMAN_BTN = 309  # Example: BTN_TR. Set to None if using axis.
+HW_CODE_DEADMAN_AXIS = None  # Example: ABS_RZ. Set to axis code for trigger.
+DEADMAN_AXIS_THRESHOLD = 0.5  # 0.0-1.0
 HW_CODE_Z_AXIS  = 5    # Your Z Axis (Right Stick Vertical?)
 
 # Standard event codes (Verify these if X/Y move wrongly)
@@ -44,7 +47,18 @@ class EvdevJoyNode(Node):
             self.get_logger().error(f"Could not find {DEVICE_PATH}. Is USBIPD attached?")
             exit(1)
 
-        self.timer = self.create_timer(0.02, self.loop) # 50Hz
+        self.deadman_axis_min = None
+        self.deadman_axis_max = None
+        self.deadman_use_axis = HW_CODE_DEADMAN_AXIS is not None
+        if HW_CODE_DEADMAN_AXIS is not None:
+            try:
+                absinfo = self.device.absinfo(HW_CODE_DEADMAN_AXIS)
+                self.deadman_axis_min = absinfo.min
+                self.deadman_axis_max = absinfo.max
+            except Exception as exc:
+                self.get_logger().warn(f"Deadman axis absinfo unavailable: {exc}")
+
+        self.timer = self.create_timer(0.015, self.loop) # 100Hz
         
         # Initialize Joy message with enough slots
         self.joy_msg = Joy()
@@ -57,6 +71,14 @@ class EvdevJoyNode(Node):
         # (128 - value) / 128.0  -> This inverts it so Up (low value) becomes Positive
         return (128.0 - value) / 128.0
 
+    def normalize_trigger(self, value):
+        if self.deadman_axis_min is None or self.deadman_axis_max is None:
+            return 0.0
+        if self.deadman_axis_max <= self.deadman_axis_min:
+            return 0.0
+        clamped = max(self.deadman_axis_min, min(self.deadman_axis_max, value))
+        return (clamped - self.deadman_axis_min) / (self.deadman_axis_max - self.deadman_axis_min)
+
     def loop(self):
         try:
             # Read all pending events from hardware
@@ -64,6 +86,11 @@ class EvdevJoyNode(Node):
                 
                 # --- AXES HANDLING ---
                 if event.type == evdev.ecodes.EV_ABS:
+                    if HW_CODE_DEADMAN_AXIS is not None and event.code == HW_CODE_DEADMAN_AXIS:
+                        trigger_norm = self.normalize_trigger(event.value)
+                        self.joy_msg.buttons[ROS_BTN_IDX_DEADMAN] = 1 if trigger_norm >= DEADMAN_AXIS_THRESHOLD else 0
+                        continue
+
                     val_norm = self.normalize_axis(event.value)
 
                     if event.code == HW_CODE_X_AXIS:
@@ -85,9 +112,16 @@ class EvdevJoyNode(Node):
 
                 # --- BUTTON HANDLING ---
                 elif event.type == evdev.ecodes.EV_KEY:
-                    if event.code == HW_CODE_DEADMAN:
-                        # Map hardware 305 to ROS Button 5
+                    if HW_CODE_DEADMAN_BTN is not None and event.code == HW_CODE_DEADMAN_BTN:
+                        # Map the deadman button to ROS Button 5
                         self.joy_msg.buttons[ROS_BTN_IDX_DEADMAN] = event.value
+
+            if not self.deadman_use_axis and HW_CODE_DEADMAN_BTN is not None:
+                try:
+                    active_keys = self.device.active_keys()
+                except Exception:
+                    active_keys = []
+                self.joy_msg.buttons[ROS_BTN_IDX_DEADMAN] = 1 if HW_CODE_DEADMAN_BTN in active_keys else 0
 
         except BlockingIOError:
             pass # No new data this loop

@@ -1,7 +1,7 @@
 # Default initial positions for my_arm's ros2_control fake system
 
 initial_positions:
-  joint_1: 0.0
-  joint_2: -0.174533
-  joint_3: -0.174533
-  joint_4: 0.0
+  joint_1: 1.2
+  joint_2: -0.8
+  joint_3: -1.1
+  joint_4: 0.3
