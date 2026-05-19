@@ -2,9 +2,9 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
-from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution, FindExecutable
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
-from launch_ros.parameter_descriptions import ParameterValue
+from moveit_configs_utils import MoveItConfigsBuilder
 import os
 import yaml
 from ament_index_python.packages import get_package_share_directory
@@ -32,42 +32,33 @@ def generate_launch_description():
 
     use_mock_hardware = LaunchConfiguration('use_mock_hardware')
 
+    moveit_config = (
+        MoveItConfigsBuilder("my_arm", package_name=moveit_pkg)
+        .robot_description(mappings={"use_mock_hardware": use_mock_hardware})
+        .to_moveit_configs()
+    )
+
     # Load Servo Config (Ensuring we use the name you confirmed: servo_config.yaml)
     servo_yaml = load_yaml(moveit_pkg, 'config/servo_config.yaml')
-    kin_yaml = load_yaml(moveit_pkg, 'config/kinematics.yaml')
+    joint_limits_yaml = load_yaml(moveit_pkg, 'config/joint_limits.yaml')
     
     # Safety exit if file is missing
-    if servo_yaml is None or kin_yaml is None:
+    if servo_yaml is None or joint_limits_yaml is None:
         return LaunchDescription([])
     
+    robot_description = moveit_config.robot_description
+    robot_description_semantic = moveit_config.robot_description_semantic
+    robot_description_kinematics = moveit_config.robot_description_kinematics
+    robot_description_planning = {"robot_description_planning": joint_limits_yaml}
+
     servo_params = {
-    'moveit_servo': servo_yaml,
-    'move_group_name': 'arm',
-    'robot_description_kinematics': kin_yaml  # Nesting the dictionary here
-}
+        'moveit_servo': servo_yaml,
+        'move_group_name': 'arm',
+    }
     # ==========================================
     # 2. ROBOT DESCRIPTION (URDF & SRDF)
     # ==========================================
-    # We use ParameterValue(..., value_type=str) to fix the YAML parsing error
-    
-    # URDF
-    robot_description_content = Command(
-        [
-            PathJoinSubstitution([FindExecutable(name="xacro")]), " ",
-            PathJoinSubstitution([FindPackageShare(description_pkg), "urdf", "my_arm.urdf.xacro"]),
-            " ", "use_mock_hardware:=", use_mock_hardware,
-        ]
-    )
-    robot_description = {"robot_description": ParameterValue(robot_description_content, value_type=str)}
-
-    # SRDF
-    robot_description_semantic_content = Command(
-        [
-            PathJoinSubstitution([FindExecutable(name="cat")]), " ",
-            PathJoinSubstitution([FindPackageShare(moveit_pkg), "config", "my_arm.srdf"]),
-        ]
-    )
-    robot_description_semantic = {"robot_description_semantic": ParameterValue(robot_description_semantic_content, value_type=str)}
+    # MoveItConfigsBuilder provides robot_description and related parameters
 
     # ==========================================
     # 3. FILE PATHS
@@ -104,7 +95,13 @@ def generate_launch_description():
     servo_node = Node(
         package='moveit_servo',
         executable='servo_node_main',
-        parameters=[servo_params, robot_description, robot_description_semantic],
+        parameters=[
+            servo_params,
+            robot_description,
+            robot_description_semantic,
+            robot_description_kinematics,
+            robot_description_planning,
+        ],
         output='screen',
     )
 
@@ -115,7 +112,11 @@ def generate_launch_description():
         name='rviz2',
         output='log',
         arguments=['-d', rviz_config_path],
-        parameters=[robot_description, robot_description_semantic]
+        parameters=[
+            robot_description,
+            robot_description_semantic,
+            robot_description_kinematics,
+        ]
     )
 
     # E. Robot State Publisher (Publishes TF frames)

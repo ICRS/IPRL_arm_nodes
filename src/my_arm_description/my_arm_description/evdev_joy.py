@@ -12,13 +12,13 @@ from sensor_msgs.msg import Joy
 DEVICE_PATH = '/dev/input/event0'
 
 # You confirmed these:
-HW_CODE_DEADMAN = 309  # Your Deadman Button RIGHT TRIGGER
-HW_CODE_Z_AXIS  = 5    # Your Z Axis (Right Stick Vertical?)
+HW_CODE_DEADMAN = 309  # Deadman button (digital)
 
 # Standard event codes (Verify these if X/Y move wrongly)
 HW_CODE_X_AXIS   = 0   # Left Stick Horizontal
 HW_CODE_Y_AXIS   = 1   # Left Stick Vertical
 HW_CODE_YAW_AXIS = 2   # Right Stick Horizontal (Standard for Xbox)
+HW_CODE_Z_AXIS   = 5   # Right Stick Vertical?
 
 # 2. ROS MAPPING (Must match xbox_mapping.yaml)
 # ------------------------------------------
@@ -52,10 +52,9 @@ class EvdevJoyNode(Node):
         self.joy_msg.buttons = [0] * 12  # Create 12 button slots
 
     def normalize_axis(self, value):
-        # Your controller is 0 to 255, with 128 as center
-        # We want -1.0 to 1.0
-        # (128 - value) / 128.0  -> This inverts it so Up (low value) becomes Positive
-        return (128.0 - value) / 128.0
+        # Map 0 -> +1.0 and 255 -> -1.0 (forward/up at 0, back/down at 255).
+        normalized = (128.0 - value) / 127.5
+        return max(-1.0, min(1.0, normalized))
 
     def loop(self):
         try:
