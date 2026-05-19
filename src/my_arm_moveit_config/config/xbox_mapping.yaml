@@ -2,13 +2,11 @@ teleop_twist_joy_node:
   ros__parameters:
     axis_linear:
       x: 1  # Left Stick Vertical -> Forward/Back
-      y: 0  # Left Stick Horizontal -> Left/Right
       z: 4  # Right Stick Vertical -> Up/Down
     axis_angular:
-      yaw: 3 # Right Stick Horizontal -> Rotate
+      yaw: 3  # Button 304/306 -> Rotate base
     scale_linear:
       x: 2.0
-      y: 2.0
       z: 2.0
     scale_angular:
       yaw: 2.0

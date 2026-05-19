@@ -47,7 +47,7 @@ self_collision_proximity_threshold: 0.01
 scene_collision_proximity_threshold: 0.02
 
 # --- SAFETY & TIMING ---
-incoming_command_timeout: 0.1 # Stop if joystick disconnects
+incoming_command_timeout: 0.05 # Stop if joystick disconnects
 smoothing_filter_coeff: 1.0   # Lower = more responsive for small jogs
 
 # --- PUBLISHING ---
