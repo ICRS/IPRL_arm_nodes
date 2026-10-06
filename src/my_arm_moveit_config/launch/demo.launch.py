@@ -14,11 +14,13 @@ def generate_launch_description():
     )
 
     ld = generate_demo_launch(moveit_config)
-    ld.add_action(
+    # Declare first so the value is set before the included rsp.launch.py resolves it.
+    ld.entities.insert(
+        0,
         DeclareLaunchArgument(
             "use_mock_hardware",
             default_value="true",
             description="Use mock_components/GenericSystem instead of the real ESP32 serial hardware",
-        )
+        ),
     )
     return ld

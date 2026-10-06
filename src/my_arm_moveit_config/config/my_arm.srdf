@@ -10,7 +10,8 @@
     <!--CHAINS: When a chain is specified, all the links along the chain (including endpoints) are included in the group. Additionally, all the joints that are parents to included links are also included. This means that joints along the chain and the parent joint of the base link are included in the group-->
     <!--SUBGROUPS: Groups can also be formed by referencing to already defined group names-->
     <group name="arm">
-        <chain base_link="base_link" tip_link="link_4"/>
+        <!-- Shoulder + elbow only (base has no encoder and is driven separately) -->
+        <chain base_link="link_1" tip_link="ee_link"/>
     </group>
     <!--VIRTUAL JOINT: Purpose: this element defines a virtual joint between a robot link and an external frame of reference (considered fixed with respect to the robot)-->
     <virtual_joint name="virtual_joint" type="fixed" parent_frame="world" child_link="base_link"/>
@@ -18,11 +19,7 @@
     <disable_collisions link1="base_link" link2="link_1" reason="Adjacent"/>
     <disable_collisions link1="base_link" link2="link_2" reason="Never"/>
     <disable_collisions link1="base_link" link2="link_3" reason="Never"/>
-    <disable_collisions link1="base_link" link2="link_4" reason="Never"/>
     <disable_collisions link1="link_1" link2="link_2" reason="Adjacent"/>
     <disable_collisions link1="link_1" link2="link_3" reason="Never"/>
-    <disable_collisions link1="link_1" link2="link_4" reason="Never"/>
     <disable_collisions link1="link_2" link2="link_3" reason="Adjacent"/>
-    <disable_collisions link1="link_2" link2="link_4" reason="Never"/>
-    <disable_collisions link1="link_3" link2="link_4" reason="Adjacent"/>
 </robot>

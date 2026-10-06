@@ -31,7 +31,6 @@
             <param name="joint_1_offset_deg">0</param>
             <param name="joint_2_offset_deg">-90</param>
             <param name="joint_3_offset_deg">-90</param>
-            <param name="joint_4_offset_deg">0</param>
           </xacro:unless>
             </hardware>
             <joint name="joint_1">
@@ -61,16 +60,6 @@
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
-            <joint name="joint_4">
-                <command_interface name="position"/>
-                <state_interface name="position">
-                  <xacro:if value="${use_mock}">
-                    <param name="initial_value">${initial_positions['joint_4']}</param>
-                  </xacro:if>
-                </state_interface>
-                <state_interface name="velocity"/>
-            </joint>
-
         </ros2_control>
     </xacro:macro>
 </robot>
