@@ -20,17 +20,10 @@ command_in_type: "speed_units" # "unitless" or "speed_units"
 
 scale:
   # Scale parameters are proportional to the max velocity of the robot
-  linear:  1.5  # Max linear velocity (m/s)
-  rotational: 1.5 # Max angular velocity (rad/s)
+  linear:  1.0  # Max linear velocity (m/s)
+  rotational: 1.0 # Max angular velocity (rad/s)
   # Joint jogging settings
   joint: 0.01
-
-# scale:
-#   # Scale parameters are proportional to the max velocity of the robot
-#   linear:  0.4  # Max linear velocity (m/s)
-#   rotational: 0.8 # Max angular velocity (rad/s)
-#   # Joint jogging settings
-#   joint: 0.01
 
 # --- TOPICS ---
 cartesian_command_in_topic: /servo_node/delta_twist_cmds
@@ -48,7 +41,7 @@ scene_collision_proximity_threshold: 0.02
 
 # --- SAFETY & TIMING ---
 incoming_command_timeout: 0.05 # Stop if joystick disconnects
-smoothing_filter_coeff: 1.0   # Lower = more responsive for small jogs
+smoothing_filter_coeff: 0.7   # Lower = more smoothing; 0.7 reduces jerk in velocity commands
 
 # --- PUBLISHING ---
 publish_period: 0.05 # 20Hz so position steps are large enough to move hardware

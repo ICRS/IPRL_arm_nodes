@@ -4,7 +4,7 @@ teleop_twist_joy_node:
       x: 1  # Left Stick Vertical -> Forward/Back
       z: 4  # Right Stick Vertical -> Up/Down
     axis_angular:
-      yaw: 3  # Button 304/306 -> Rotate base
+      yaw: 3  # HAT0X (code 16) -> Rotate base
     scale_linear:
       x: 2.0
       z: 2.0
