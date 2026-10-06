@@ -1,53 +1,67 @@
+import sys
+
 import evdev
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
+from std_msgs.msg import Float64
 
 # ==========================================
 # CONFIGURATION SECTION
 # ==========================================
 
-# 1. HARDWARE CODES (From 'evtest')
+# 1. HARDWARE CODES (PowerA NSW wired controller, measured with joy_map.py / evtest)
 # ------------------------------------------
-DEVICE_PATH = '/dev/input/event0'
+# Stable path for this pad; override with:  --ros-args -p device:=/dev/input/eventN
+DEFAULT_DEVICE = '/dev/input/by-id/usb-PowerA_NSW_wired_controller-event-joystick'
 
-HW_CODE_DEADMAN   = 309  # Deadman button (digital). MUST be held to move.
-HW_CODE_FWD_BACK  = 1    # EV_ABS, 0-255. Forward/back.  <128 = forward, >128 = back.
-HW_CODE_UP_DOWN   = 5    # EV_ABS, 0-255. Up/down.       <128 = up,      >128 = down.
-HW_CODE_BASE_HAT  = 16   # EV_ABS HAT0X, values -1/0/+1. Arrow pad: -1 = left, +1 = right.
+HW_CODE_DEADMAN   = 309  # BTN_Z. MUST be held to move. Reads 1 while pressed.
+HW_CODE_FWD_BACK  = 1    # ABS_Y  left stick,  0-255. 0 = forward, 255 = back.
+HW_CODE_BASE      = 0    # ABS_X  left stick,  0-255. 0 = left,    255 = right.
+HW_CODE_UP_DOWN   = 5    # ABS_RZ right stick, 0-255. 0 = up,      255 = down.
 
-# 2. ROS MAPPING (Must match xbox_mapping.yaml)
+# 2. ROS MAPPING (Must match the JOY_* constants in arm_teleop.py)
 # ------------------------------------------
-ROS_BTN_IDX_DEADMAN = 5   # enable_button: 5
-ROS_AXIS_IDX_X      = 1   # axis_linear.x  -> Forward/back (linear.x)
-ROS_AXIS_IDX_Z      = 4   # axis_linear.z  -> Up/down      (linear.z)
-ROS_AXIS_IDX_YAW    = 3   # axis_angular.yaw -> Rotate base (angular.yaw)
+ROS_BTN_IDX_DEADMAN = 5   # JOY_BTN_DEADMAN
+ROS_AXIS_IDX_X      = 1   # JOY_AXIS_FWD -> arm forward/back
+ROS_AXIS_IDX_Z      = 4   # JOY_AXIS_UP  -> arm up/down
+
+# Base is not part of the arm kinematics: it is driven directly by publishing a
+# direction (+1 right, -1 left, 0 stop). The hardware plugin stops the base if this
+# topic goes quiet for 200 ms (e.g. this node dies).
+BASE_TOPIC = '/base_cmd'
 
 # 3. DIRECTION / POLARITY (flip in one line if a motion is reversed)
 # ------------------------------------------
-# Deadman is inverted in hardware: physically holding 309 emits value 0.
-# So "held" == value 0. Set to 1 if you ever swap to a normal-polarity button.
-DEADMAN_HELD_VALUE = 0
+DEADMAN_HELD_VALUE = 1    # this pad reports 1 while the deadman button is held
 
-DIR_FWD  = +1.0   # base_link +x = forward. normalize() already gives + for <128.
-DIR_UP   = +1.0   # base_link +z = up.
-DIR_BASE = +1.0   # HAT left (-1) -> +yaw (left). Flip to -1.0 to reverse base rotation.
+DIR_FWD  = -1.0   # flipped after real-arm test: stick forward must move the arm forward.
+DIR_UP   = +1.0   # base_link +z = up.      normalize() already gives + for 0 (up).
+DIR_BASE = -1.0   # normalize() gives - for 255 (right); -1 makes right = +1 (turn right).
 
-DEADZONE = 0.05   # ignore tiny stick-center drift to avoid creep/oscillation.
+DEADZONE = 0.05        # ignore tiny stick-center drift to avoid creep/oscillation.
+BASE_THRESHOLD = 0.5   # stick must be pushed past half way before the base turns.
 
 
 class EvdevJoyNode(Node):
     def __init__(self):
         super().__init__('evdev_joy')
-        # Publish to /joy so teleop_twist_joy_node can read it
+        # Publish to /joy so arm_teleop can read it
         self.publisher_ = self.create_publisher(Joy, '/joy', 10)
+        self.base_publisher_ = self.create_publisher(Float64, BASE_TOPIC, 10)
 
+        device_path = self.declare_parameter('device', DEFAULT_DEVICE).value
         try:
-            self.device = evdev.InputDevice(DEVICE_PATH)
-            self.get_logger().info(f"Connected to {self.device.name}")
+            self.device = evdev.InputDevice(device_path)
+            self.get_logger().info(f"Connected to {self.device.name} ({device_path})")
         except FileNotFoundError:
-            self.get_logger().error(f"Could not find {DEVICE_PATH}. Is USBIPD attached?")
-            exit(1)
+            self.get_logger().error(f"Could not find {device_path}. Is the controller plugged in?")
+            sys.exit(1)
+        except PermissionError:
+            self.get_logger().error(
+                f"No permission to read {device_path}. Add yourself to the 'input' group "
+                "(sudo usermod -aG input $USER) and log out/in.")
+            sys.exit(1)
 
         self.timer = self.create_timer(0.02, self.loop)  # 50Hz
 
@@ -55,6 +69,8 @@ class EvdevJoyNode(Node):
         self.joy_msg = Joy()
         self.joy_msg.axes = [0.0] * 8    # Create 8 axes slots
         self.joy_msg.buttons = [0] * 12  # Create 12 button slots
+
+        self.base_axis = 0.0
 
     def normalize_axis(self, value):
         # Map 0 -> +1.0 and 255 -> -1.0 (forward/up at 0, back/down at 255).
@@ -77,9 +93,8 @@ class EvdevJoyNode(Node):
                     elif event.code == HW_CODE_UP_DOWN:
                         self.joy_msg.axes[ROS_AXIS_IDX_Z] = DIR_UP * self.normalize_axis(event.value)
 
-                    elif event.code == HW_CODE_BASE_HAT:
-                        # HAT0X is already -1/0/+1, so do NOT normalize it.
-                        self.joy_msg.axes[ROS_AXIS_IDX_YAW] = DIR_BASE * (-float(event.value))
+                    elif event.code == HW_CODE_BASE:
+                        self.base_axis = DIR_BASE * self.normalize_axis(event.value)
 
                 # --- BUTTON HANDLING ---
                 elif event.type == evdev.ecodes.EV_KEY:
@@ -90,11 +105,16 @@ class EvdevJoyNode(Node):
         except BlockingIOError:
             pass  # No new data this loop
 
-        # Stamp and publish. On deadman release buttons[5] is 0, so teleop_twist_joy
-        # emits one zero-twist on the enable->disable transition and Servo's
-        # incoming_command_timeout halts the arm.
+        # Stamp and publish. On deadman release buttons[5] is 0, so arm_teleop sends one
+        # zero command and then nothing; Servo's incoming_command_timeout halts the arm.
         self.joy_msg.header.stamp = self.get_clock().now().to_msg()
         self.publisher_.publish(self.joy_msg)
+
+        # Base direction: only while the deadman is held and the stick is pushed far enough.
+        base_dir = 0.0
+        if self.joy_msg.buttons[ROS_BTN_IDX_DEADMAN] and abs(self.base_axis) >= BASE_THRESHOLD:
+            base_dir = 1.0 if self.base_axis > 0.0 else -1.0
+        self.base_publisher_.publish(Float64(data=base_dir))
 
 
 def main(args=None):

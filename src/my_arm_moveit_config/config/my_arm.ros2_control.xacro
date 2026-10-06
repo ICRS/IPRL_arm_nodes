@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-    <xacro:macro name="my_arm_ros2_control" params="name initial_positions_file use_mock_hardware">
+    <xacro:macro name="my_arm_ros2_control" params="name initial_positions_file use_mock_hardware serial_port">
         <xacro:property name="initial_positions" value="${load_yaml(initial_positions_file)['initial_positions']}"/>
         <xacro:property name="use_mock" value="${use_mock_hardware}"/>
 
@@ -11,7 +11,7 @@
           </xacro:if>
           <xacro:unless value="${use_mock}">
             <plugin>my_arm_hardware/Esp32SerialHardware</plugin>
-            <param name="port">/dev/ttyUSB0</param>
+            <param name="port">${serial_port}</param>
             <param name="baud_rate">115200</param>
                     <param name="real_joints">3</param>
                     <param name="id_offset">0</param>
@@ -24,10 +24,14 @@
             <param name="ping_on_activate">true</param>
                     <param name="ping_id">50</param>
             <param name="ping_timeout_ms">300</param>
-            <param name="joint_1_min_deg">0</param>
-            <param name="joint_1_max_deg">360</param>
+            <!-- Firmware angles (90 = straight up); must match the clamps in config.h -->
             <param name="joint_2_min_deg">0</param>
             <param name="joint_2_max_deg">160</param>
+            <param name="joint_3_min_deg">-70</param>
+            <param name="joint_3_max_deg">90</param>
+            <!-- Base: direction commands from the joystick (+1 right, -1 left, 0 stop) -->
+            <param name="base_cmd_topic">/base_cmd</param>
+            <param name="base_cmd_timeout_ms">200</param>
             <param name="joint_1_offset_deg">0</param>
             <param name="joint_2_offset_deg">-90</param>
             <param name="joint_3_offset_deg">-90</param>

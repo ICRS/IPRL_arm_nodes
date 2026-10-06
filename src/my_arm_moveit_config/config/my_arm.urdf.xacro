@@ -2,6 +2,9 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="my_arm">
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
     <xacro:arg name="use_mock_hardware" default="false" />
+    <!-- ESP32 serial port. by-id path stays the same whichever ttyUSBn it gets. -->
+    <xacro:arg name="serial_port"
+               default="/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0" />
 
     <!-- Import my_arm urdf file -->
     <xacro:include filename="$(find my_arm_description)/urdf/my_arm.urdf.xacro" />
@@ -13,6 +16,7 @@
     <xacro:my_arm_ros2_control
         name="FakeSystem"
         initial_positions_file="$(arg initial_positions_file)"
-        use_mock_hardware="$(arg use_mock_hardware)"/>
+        use_mock_hardware="$(arg use_mock_hardware)"
+        serial_port="$(arg serial_port)"/>
 
 </robot>

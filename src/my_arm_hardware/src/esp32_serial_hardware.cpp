@@ -33,14 +33,18 @@ Esp32SerialHardware::Esp32SerialHardware()
   stream_without_id_(false),
   wait_for_first_state_(false),
   state_timeout_ms_(500),
-  joint_1_min_deg_(0.0),
-  joint_1_max_deg_(360.0),
   joint_2_min_deg_(0.0),
   joint_2_max_deg_(160.0),
+  joint_3_min_deg_(-70.0),
+  joint_3_max_deg_(90.0),
   joint_1_offset_deg_(0.0),
   joint_2_offset_deg_(0.0),
   joint_3_offset_deg_(0.0),
-  joint_4_offset_deg_(0.0),
+  base_cmd_topic_("/base_cmd"),
+  base_cmd_timeout_ms_(200),
+  base_cmd_dir_(0),
+  base_cmd_stamp_ns_(0),
+  base_sent_dir_(0),
   logger_(rclcpp::get_logger("my_arm_hardware")),
   serial_(io_),
   stop_requested_(false),
@@ -72,14 +76,15 @@ hardware_interface::CallbackReturn Esp32SerialHardware::on_init(
   stream_without_id_ = get_param_bool("stream_without_id", stream_without_id_);
   wait_for_first_state_ = get_param_bool("wait_for_first_state", wait_for_first_state_);
   state_timeout_ms_ = get_param_int("state_timeout_ms", state_timeout_ms_);
-  joint_1_min_deg_ = get_param_double("joint_1_min_deg", joint_1_min_deg_);
-  joint_1_max_deg_ = get_param_double("joint_1_max_deg", joint_1_max_deg_);
   joint_2_min_deg_ = get_param_double("joint_2_min_deg", joint_2_min_deg_);
   joint_2_max_deg_ = get_param_double("joint_2_max_deg", joint_2_max_deg_);
+  joint_3_min_deg_ = get_param_double("joint_3_min_deg", joint_3_min_deg_);
+  joint_3_max_deg_ = get_param_double("joint_3_max_deg", joint_3_max_deg_);
   joint_1_offset_deg_ = get_param_double("joint_1_offset_deg", joint_1_offset_deg_);
   joint_2_offset_deg_ = get_param_double("joint_2_offset_deg", joint_2_offset_deg_);
   joint_3_offset_deg_ = get_param_double("joint_3_offset_deg", joint_3_offset_deg_);
-  joint_4_offset_deg_ = get_param_double("joint_4_offset_deg", joint_4_offset_deg_);
+  base_cmd_topic_ = get_param_string("base_cmd_topic", base_cmd_topic_);
+  base_cmd_timeout_ms_ = get_param_int("base_cmd_timeout_ms", base_cmd_timeout_ms_);
 
   if (real_joints_ < 0) {
     real_joints_ = 0;
@@ -156,6 +161,24 @@ std::vector<hardware_interface::CommandInterface> Esp32SerialHardware::export_co
 hardware_interface::CallbackReturn Esp32SerialHardware::on_configure(
   const rclcpp_lifecycle::State &)
 {
+  // Base direction commands (+1 right, -1 left, 0 stop). The subscription runs on the
+  // controller manager's executor; the RT write() only reads the two atomics.
+  auto node = get_node();
+  if (!node) {
+    RCLCPP_ERROR(logger_, "No hardware node available: base commands are disabled.");
+    return hardware_interface::CallbackReturn::SUCCESS;
+  }
+  base_cmd_sub_ = node->create_subscription<std_msgs::msg::Float64>(
+    base_cmd_topic_, rclcpp::SystemDefaultsQoS(),
+    [this](const std_msgs::msg::Float64::SharedPtr msg) {
+      const int dir = (msg->data > 0.0) ? 1 : ((msg->data < 0.0) ? -1 : 0);
+      base_cmd_dir_ = dir;
+      base_cmd_stamp_ns_ = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    });
+  RCLCPP_INFO(
+    logger_, "Base commands on '%s' (stops after %d ms without a command)",
+    base_cmd_sub_->get_topic_name(), base_cmd_timeout_ms_);
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -220,12 +243,30 @@ hardware_interface::CallbackReturn Esp32SerialHardware::on_activate(
     }
   }
 
+  // Hold the measured position: start every command at the current state so nothing
+  // moves on activation. Joints without a measured state are not commanded until one
+  // arrives (see write()).
+  for (size_t i = 0; i < info_.joints.size(); ++i) {
+    if (static_cast<int>(i) < real_joints_ && have_state(i)) {
+      hw_states_[i] = deg_to_rad(latest_joint_deg_[joint_ids_[i]] + get_joint_offset_deg(i));
+    }
+    hw_commands_[i] = hw_states_[i];
+  }
+
+  // Base starts stopped.
+  base_cmd_dir_ = 0;
+  base_sent_dir_ = 0;
+  send_line("<DES_VAL:" + std::to_string(joint_ids_[0]) + ",0>");
+  base_last_send_time_ = std::chrono::steady_clock::now();
+
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
 hardware_interface::CallbackReturn Esp32SerialHardware::on_deactivate(
   const rclcpp_lifecycle::State &)
 {
+  // Stop the base before letting go of the port.
+  send_line("<DES_VAL:" + std::to_string(joint_ids_[0]) + ",0>");
   stop_read_thread();
   close_serial();
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -285,13 +326,20 @@ hardware_interface::return_type Esp32SerialHardware::write(
     return hardware_interface::return_type::ERROR;
   }
 
-  for (int i = 0; i < real_joints_; ++i) {
+  write_base();
+
+  // Arm joints (index 1.. ; index 0 is the base, handled above).
+  for (int i = 1; i < real_joints_; ++i) {
+    // Never command a joint we have not measured yet, or a non-finite command.
+    if (!have_state(i) || !std::isfinite(hw_commands_[i])) {
+      continue;
+    }
     double command_deg = rad_to_deg(hw_commands_[i]);
     command_deg -= get_joint_offset_deg(i);
-    if (i == 0) {
-      command_deg = std::min(std::max(command_deg, joint_1_min_deg_), joint_1_max_deg_);
-    } else if (i == 1) {
+    if (i == 1) {
       command_deg = std::min(std::max(command_deg, joint_2_min_deg_), joint_2_max_deg_);
+    } else if (i == 2) {
+      command_deg = std::min(std::max(command_deg, joint_3_min_deg_), joint_3_max_deg_);
     }
 
     std::ostringstream command;
@@ -301,6 +349,35 @@ hardware_interface::return_type Esp32SerialHardware::write(
   }
 
   return hardware_interface::return_type::OK;
+}
+
+void Esp32SerialHardware::write_base()
+{
+  // Use the latest base command only if it is fresh; otherwise stop. This is what makes
+  // the base stop if the joystick node dies or the deadman is released.
+  const auto now = std::chrono::steady_clock::now();
+  const int64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+    now.time_since_epoch()).count();
+  const int64_t age_ns = now_ns - base_cmd_stamp_ns_.load();
+  const bool fresh = age_ns <= static_cast<int64_t>(base_cmd_timeout_ms_) * 1000000;
+  const int dir = fresh ? base_cmd_dir_.load() : 0;
+
+  // Send on change, and resend every 100 ms while turning to keep the firmware's
+  // own base timeout (1 s) from stopping it.
+  const bool changed = dir != base_sent_dir_;
+  const bool refresh = dir != 0 && (now - base_last_send_time_) >= std::chrono::milliseconds(100);
+  if (changed || refresh) {
+    send_line("<DES_VAL:" + std::to_string(joint_ids_[0]) + "," + std::to_string(dir) + ">");
+    base_sent_dir_ = dir;
+    base_last_send_time_ = now;
+  }
+}
+
+bool Esp32SerialHardware::have_state(size_t index) const
+{
+  const int id = joint_ids_[index];
+  return id >= 0 && static_cast<size_t>(id) < latest_joint_deg_valid_.size() &&
+         latest_joint_deg_valid_[id];
 }
 
 bool Esp32SerialHardware::open_serial()
@@ -598,8 +675,6 @@ double Esp32SerialHardware::get_joint_offset_deg(size_t index) const
       return joint_2_offset_deg_;
     case 2:
       return joint_3_offset_deg_;
-    case 3:
-      return joint_4_offset_deg_;
     default:
       return 0.0;
   }

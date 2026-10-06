@@ -91,7 +91,7 @@
     <child link="link_2"/>
     <origin xyz="0 0 0.1" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-1.570796" upper="1.221730" effort="200" velocity="0.6"/>
+    <limit lower="-1.570796" upper="1.221730" effort="200" velocity="0.3"/>
   </joint>
 
   <joint name="joint_3" type="revolute">
@@ -99,7 +99,7 @@
     <child link="link_3"/>
     <origin xyz="0 0 0.405" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-3.141593" upper="0.0" effort="100" velocity="0.26"/>
+    <limit lower="-2.792527" upper="0.0" effort="100" velocity="0.3"/>
   </joint>
 
   <joint name="ee_joint" type="fixed">

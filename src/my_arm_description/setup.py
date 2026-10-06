@@ -40,6 +40,7 @@ setup(
         'console_scripts': [
             # executable_name = package.script_name:main_function
             'evdev_joy = my_arm_description.evdev_joy:main',
+            'arm_teleop = my_arm_description.arm_teleop:main',
         ],
     },
 )

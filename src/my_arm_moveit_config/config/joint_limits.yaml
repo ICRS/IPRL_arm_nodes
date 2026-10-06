@@ -19,14 +19,14 @@ joint_limits:
     min_position: -1.570796
     max_position: 1.221730
     has_velocity_limits: true
-    max_velocity: 0.45
+    max_velocity: 0.3           # firmware max is 20 deg/s (0.35 rad/s)
     has_acceleration_limits: false
     max_acceleration: 0.0
   joint_3:
     has_position_limits: true
-    min_position: -3.141593
+    min_position: -2.792527     # -160 deg = firmware -70 deg (ELBOW_MIN_DEG)
     max_position: 0.0
     has_velocity_limits: true
-    max_velocity: 1.35
+    max_velocity: 0.3           # firmware max is 20 deg/s (0.35 rad/s)
     has_acceleration_limits: false
     max_acceleration: 0.0

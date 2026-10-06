@@ -12,7 +12,9 @@
 #include <boost/asio.hpp>
 #include <hardware_interface/system_interface.hpp>
 #include <rclcpp/logger.hpp>
+#include <rclcpp/rclcpp.hpp>
 #include <rclcpp_lifecycle/state.hpp>
+#include <std_msgs/msg/float64.hpp>
 
 namespace my_arm_hardware
 {
@@ -50,6 +52,8 @@ private:
   double rad_to_deg(double rad) const;
   double deg_to_rad(double deg) const;
   double get_joint_offset_deg(size_t index) const;
+  bool have_state(size_t index) const;
+  void write_base();
 
   std::string port_;
   int baud_rate_;
@@ -64,14 +68,24 @@ private:
   bool stream_without_id_;
   bool wait_for_first_state_;
   int state_timeout_ms_;
-  double joint_1_min_deg_;
-  double joint_1_max_deg_;
   double joint_2_min_deg_;
   double joint_2_max_deg_;
+  double joint_3_min_deg_;
+  double joint_3_max_deg_;
   double joint_1_offset_deg_;
   double joint_2_offset_deg_;
   double joint_3_offset_deg_;
-  double joint_4_offset_deg_;
+
+  // Base (joint index 0) has no encoder and is driven by direction only.
+  // Commands arrive on base_cmd_topic_ (+1 right, -1 left, 0 stop) and the base is
+  // stopped if no fresh command arrives within base_cmd_timeout_ms_.
+  std::string base_cmd_topic_;
+  int base_cmd_timeout_ms_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr base_cmd_sub_;
+  std::atomic<int> base_cmd_dir_;
+  std::atomic<int64_t> base_cmd_stamp_ns_;  // steady_clock time of the last command
+  int base_sent_dir_;
+  std::chrono::steady_clock::time_point base_last_send_time_;
 
   rclcpp::Logger logger_;
 

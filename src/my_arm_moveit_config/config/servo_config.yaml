@@ -1,48 +1,56 @@
 ###############################################
-# MoveIt Servo Configuration
+# MoveIt Servo configuration (Jazzy, moveit_servo 2.12)
+# Loaded under the 'moveit_servo' namespace by demo_joystick.launch.py.
+# Parameter reference: /opt/ros/jazzy/share/moveit_servo/config/servo_parameters.yaml
 ###############################################
 
-# --- CRITICAL FRAME DEFINITIONS (MISSING IN YOUR FILE) ---
-# The reference frame for your joystick commands (usually 'base_link' or 'world')
-planning_frame: base_link
+# SRDF group: chain link_1 -> ee_link (shoulder + elbow; base and wrist are not in it).
+# In this version there are no ee_frame / planning_frame parameters: they come from
+# this group.
+move_group_name: arm
 
-# The specific link you want to move (the tip of your arm)
-# Use the last real joint's link to avoid commanding a non-existent joint.
-ee_frame_name: link_3
-
-# The frame the robot commands should be calculated in (usually same as planning_frame)
-robot_link_command_frame: base_link
-
-# --- GENERAL CONFIG ---
-move_group_name: arm  # Must match the group name in your SRDF
-command_in_type: "speed_units" # "unitless" or "speed_units"
-
-
+# --- INPUT ---
+# arm_teleop (my_arm_description) solves the 2-link IK itself and sends shoulder/elbow
+# speeds as JointJog commands in rad/s (Servo is switched to JOINT_JOG mode at launch).
+# Cartesian twist mode is not used: with only 2 joints, Servo's 6-D solve cannot follow
+# a planar x/z command.
+command_in_type: "speed_units"
 scale:
-  # Scale parameters are proportional to the max velocity of the robot
-  linear:  1.0  # Max linear velocity (m/s)
-  rotational: 1.0 # Max angular velocity (rad/s)
-  # Joint jogging settings
-  joint: 0.01
+  linear: 0.08      # only used by twist/pose commands (not used here)
+  rotational: 0.2   # only used by twist/pose commands (not used here)
+  joint: 0.5        # only used by unitless joint commands (not used here)
 
-# --- TOPICS ---
-cartesian_command_in_topic: /servo_node/delta_twist_cmds
-joint_command_in_topic: /delta_joint_cmds
-status_topic: /servo_server/status
+cartesian_command_in_topic: ~/delta_twist_cmds   # -> /servo_node/delta_twist_cmds
+joint_command_in_topic: ~/delta_joint_cmds
+status_topic: ~/status
+
+# --- SAFETY & TIMING ---
+# Commands older than this are discarded and the arm halts. arm_teleop only publishes
+# while the deadman is held, so the arm stops within this time if anything goes quiet.
+incoming_command_timeout: 0.1
+publish_period: 0.01          # 100 Hz, same as the controller manager
+max_expected_latency: 0.1
+joint_limit_margins: [0.05]   # rad kept clear of each joint limit
+
+# --- OUTPUT ---
 command_out_topic: /arm_controller/joint_trajectory
+command_out_type: trajectory_msgs/JointTrajectory
+publish_joint_positions: true
+publish_joint_velocities: true
+publish_joint_accelerations: false
+joint_topic: /joint_states
+
+# --- SMOOTHING ---
+use_smoothing: true
+smoothing_filter_plugin_name: "online_signal_smoothing::ButterworthFilterPlugin"
 
 # --- COLLISION CHECKING ---
-# Kept 'false' as requested for debugging.
 check_collisions: false
-collision_check_rate: 10.0 # Hz
-collision_check_type: "threshold_distance"
+collision_check_rate: 10.0
 self_collision_proximity_threshold: 0.01
 scene_collision_proximity_threshold: 0.02
 
-# --- SAFETY & TIMING ---
-incoming_command_timeout: 0.05 # Stop if joystick disconnects
-smoothing_filter_coeff: 0.7   # Lower = more smoothing; 0.7 reduces jerk in velocity commands
-
-# --- PUBLISHING ---
-publish_period: 0.05 # 20Hz so position steps are large enough to move hardware
-low_latency_mode: false
+# --- SINGULARITIES ---
+lower_singularity_threshold: 17.0
+hard_stop_singularity_threshold: 30.0
+leaving_singularity_threshold_multiplier: 2.0

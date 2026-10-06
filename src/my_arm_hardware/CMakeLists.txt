@@ -10,6 +10,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system)
 
 add_library(my_arm_hardware SHARED
@@ -26,6 +27,7 @@ ament_target_dependencies(my_arm_hardware
   rclcpp_lifecycle
   hardware_interface
   pluginlib
+  std_msgs
 )
 
 target_link_libraries(my_arm_hardware Boost::system)
@@ -48,6 +50,6 @@ install(FILES my_arm_hardware_plugins.xml
 
 ament_export_include_directories(include)
 ament_export_libraries(my_arm_hardware)
-ament_export_dependencies(rclcpp rclcpp_lifecycle hardware_interface pluginlib Boost)
+ament_export_dependencies(rclcpp rclcpp_lifecycle hardware_interface pluginlib std_msgs Boost)
 
 ament_package()

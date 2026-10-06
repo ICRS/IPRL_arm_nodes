@@ -24,7 +24,11 @@ arm_controller:
       - velocity
     
     # CRITICAL FIX 1: Allow moving just one joint (or a subset) without error
-    allow_partial_joints_goal: true 
+    allow_partial_joints_goal: true
+
+    # Servo streams short trajectories that end while still moving; without this the
+    # controller rejects them ("Velocity of last trajectory point ... is not zero").
+    allow_nonzero_velocity_at_trajectory_end: true
     
     # CRITICAL FIX 2: Relax timing constraints so Servo commands aren't dropped
     constraints:
