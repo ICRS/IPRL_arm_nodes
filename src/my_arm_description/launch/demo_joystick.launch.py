@@ -2,7 +2,7 @@
 
 Left stick fwd/back   -> arm forward/back  (arm_teleop 2-link IK -> Servo joint jog)
 Right stick up/down   -> arm up/down       (arm_teleop 2-link IK -> Servo joint jog)
-Left stick left/right -> base left/right   (evdev_joy /base_cmd -> hardware plugin)
+D-pad left/right      -> base left/right   (evdev_joy /base_cmd -> hardware plugin)
 Nothing moves unless the deadman button is held.
 
   ros2 launch my_arm_description demo_joystick.launch.py                         # real arm

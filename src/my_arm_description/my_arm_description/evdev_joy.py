@@ -17,7 +17,7 @@ DEFAULT_DEVICE = '/dev/input/by-id/usb-PowerA_NSW_wired_controller-event-joystic
 
 HW_CODE_DEADMAN   = 309  # BTN_Z. MUST be held to move. Reads 1 while pressed.
 HW_CODE_FWD_BACK  = 1    # ABS_Y  left stick,  0-255. 0 = forward, 255 = back.
-HW_CODE_BASE      = 0    # ABS_X  left stick,  0-255. 0 = left,    255 = right.
+HW_CODE_BASE      = 16   # ABS_HAT0X D-pad left/right: -1 = left, 0 = released, +1 = right.
 HW_CODE_UP_DOWN   = 5    # ABS_RZ right stick, 0-255. 0 = up,      255 = down.
 
 # 2. ROS MAPPING (Must match the JOY_* constants in arm_teleop.py)
@@ -37,10 +37,10 @@ DEADMAN_HELD_VALUE = 1    # this pad reports 1 while the deadman button is held
 
 DIR_FWD  = -1.0   # flipped after real-arm test: stick forward must move the arm forward.
 DIR_UP   = +1.0   # base_link +z = up.      normalize() already gives + for 0 (up).
-DIR_BASE = -1.0   # normalize() gives - for 255 (right); -1 makes right = +1 (turn right).
+DIR_BASE = +1.0   # D-pad right (+1) -> turn right (+1). Flip to -1.0 if the base turns the wrong way.
 
 DEADZONE = 0.05        # ignore tiny stick-center drift to avoid creep/oscillation.
-BASE_THRESHOLD = 0.5   # stick must be pushed past half way before the base turns.
+BASE_THRESHOLD = 0.5   # D-pad is already -1/0/+1; kept so a stick could be used again.
 
 
 class EvdevJoyNode(Node):
@@ -94,7 +94,8 @@ class EvdevJoyNode(Node):
                         self.joy_msg.axes[ROS_AXIS_IDX_Z] = DIR_UP * self.normalize_axis(event.value)
 
                     elif event.code == HW_CODE_BASE:
-                        self.base_axis = DIR_BASE * self.normalize_axis(event.value)
+                        # D-pad is already -1/0/+1, so do NOT normalize it.
+                        self.base_axis = DIR_BASE * float(event.value)
 
                 # --- BUTTON HANDLING ---
                 elif event.type == evdev.ecodes.EV_KEY:
